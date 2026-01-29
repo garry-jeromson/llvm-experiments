@@ -10,7 +10,8 @@ llvm-experiments/
 ├── build/                      # Build output (llc, clang, opt binaries)
 ├── src/llvm-project/           # LLVM monorepo
 │   └── llvm/lib/Target/W65816/ # Our backend implementation
-└── test_*.ll                   # Test files
+│   └── llvm/test/CodeGen/W65816/ # Backend tests (FileCheck-based)
+└── CLAUDE.md                   # This file
 ```
 
 ## Key Backend Files
@@ -92,17 +93,70 @@ All indirect addressing modes now work:
 
 ## Testing
 
+**IMPORTANT: All changes must pass tests before committing.**
+
+Tests are located in `src/llvm-project/llvm/test/CodeGen/W65816/` and use LLVM's standard FileCheck infrastructure.
+
+### Running Tests
+
 ```bash
-# Run a specific test
-./build/bin/llc -march=w65816 test_indirect.ll -o -
+# Run W65816 tests only (REQUIRED after every change)
+ninja -C build check-llvm-codegen-w65816
+
+# Alternative using make
+make test-w65816
+
+# Run all CodeGen tests (includes W65816)
+ninja -C build check-llvm-codegen
+
+# Run full LLVM test suite
+ninja -C build check-llvm
+```
+
+### Test Files
+
+| File | Coverage |
+|------|----------|
+| `arithmetic.ll` | add, sub, inc, dec |
+| `logical.ll` | and, or, xor |
+| `shifts.ll` | constant and variable shifts |
+| `memory.ll` | loads, stores, indirect addressing |
+| `control-flow.ll` | calls, returns, branches |
+| `basic.ll` | basic operations |
+
+### Writing Tests
+
+Tests use FileCheck directives:
+```llvm
+; RUN: llc -march=w65816 < %s | FileCheck %s
+
+; CHECK-LABEL: function_name:
+; CHECK: expected_instruction
+define i16 @function_name(i16 %a) {
+  ; ... IR ...
+}
+```
+
+### Workflow
+
+```bash
+# After making changes:
+make rebuild && ninja -C build check-llvm-codegen-w65816
+```
+
+## Manual Testing
+
+```bash
+# Compile and view assembly
+./build/bin/llc -march=w65816 test_file.ll -o -
 
 # Generate object file
 ./build/bin/llc -march=w65816 -filetype=obj test_file.ll -o test_file.o
 ```
 
-## Next Steps (In Order)
+## Next Steps
 
-1. **Fix indirect addressing** - Handle 8-bit sub-loads for pointers
+1. **Fix setcc legalization** - Conditional branches crash (icmp/br patterns)
 2. **8-bit mode switching** - REP/SEP instructions for mode changes
 3. **Multiply/divide support** - Library call expansion
-4. **Register allocation improvements** - Better spilling strategies
+4. **Assembly parser** - Enable inline asm testing
