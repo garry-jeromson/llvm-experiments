@@ -75,9 +75,9 @@ The backend implements approximately **70-75%** of the W65816 capabilities. The 
 
 | Instruction | Issue |
 |-------------|-------|
-| BIT | Only immediate mode, missing absolute/DP |
+| BIT | ✅ All modes defined (immediate, absolute, DP, abs+X, DP+X) - instructions can be used via assembly |
 | ASL/LSR/ROL/ROR | ✅ All modes defined (accumulator, DP, DP+X, abs, abs+X) - no selection patterns yet |
-| INC/DEC | Only accumulator, missing memory modes |
+| INC/DEC | ✅ All modes defined (accumulator, absolute, DP, abs+X, DP+X) - memory modes usable via assembly |
 | STZ | Missing some addressing modes |
 
 ### ❌ Not Implemented
