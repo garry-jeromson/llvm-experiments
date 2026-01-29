@@ -76,7 +76,7 @@ make rebuild       # Incremental rebuild after changes
 ### Not Implemented
 - 8-bit/16-bit mode switching (REP/SEP partially there)
 - Long (24-bit) addressing
-- Interrupt handling
+- Assembly parser (for inline asm)
 
 ### Implemented via Library Calls
 - Multiply: `__mulhi3`
@@ -132,6 +132,7 @@ ninja -C build check-llvm
 | `control-flow.ll` | calls, returns, branches |
 | `basic.ll` | basic operations |
 | `mul-div-rem.ll` | multiply, divide, remainder (libcalls) |
+| `interrupt.ll` | interrupt handler support (RTI, register save/restore) |
 
 ### Writing Tests
 
