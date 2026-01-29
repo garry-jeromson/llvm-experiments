@@ -41,7 +41,7 @@ NC := \033[0m
 
 .PHONY: all help deps clone setup configure build build-fast install \
         scaffold link-backend rebuild tablegen \
-        clean distclean update info list-targets test
+        clean distclean update info list-targets test test-w65816
 
 # Default target
 all: help
@@ -506,3 +506,30 @@ test-backend:
 	fi
 	@cmake --build $(BUILD_DIR) --target check-llvm-codegen-$(shell echo $(BACKEND_NAME) | tr A-Z a-z) 2>/dev/null || \
 		echo "$(YELLOW)No specific tests found for $(BACKEND_NAME). Run 'make test' for all tests.$(NC)"
+
+# W65816-specific test target
+TEST_DIR := $(SRC_DIR)/llvm/test/CodeGen/W65816
+test-w65816:
+	@echo "$(BLUE)Running W65816 backend tests...$(NC)"
+	@if [ ! -x "$(BUILD_DIR)/bin/llc" ]; then \
+		echo "$(RED)Error: llc not built. Run 'make build-fast' first.$(NC)"; \
+		exit 1; \
+	fi
+	@if [ ! -x "$(BUILD_DIR)/bin/FileCheck" ]; then \
+		echo "$(RED)Error: FileCheck not built. Run 'make build-fast' first.$(NC)"; \
+		exit 1; \
+	fi
+	@PASS=0; FAIL=0; \
+	for f in $(TEST_DIR)/*.ll; do \
+		printf "Testing $$(basename $$f)... "; \
+		if $(BUILD_DIR)/bin/llc -march=w65816 "$$f" -o - 2>&1 | $(BUILD_DIR)/bin/FileCheck "$$f" 2>/dev/null; then \
+			echo "$(GREEN)PASS$(NC)"; \
+			PASS=$$((PASS + 1)); \
+		else \
+			echo "$(RED)FAIL$(NC)"; \
+			FAIL=$$((FAIL + 1)); \
+		fi; \
+	done; \
+	echo ""; \
+	echo "$(BLUE)Results: $$PASS passed, $$FAIL failed$(NC)"; \
+	if [ $$FAIL -gt 0 ]; then exit 1; fi
