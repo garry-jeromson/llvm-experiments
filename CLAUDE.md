@@ -76,8 +76,16 @@ make rebuild       # Incremental rebuild after changes
 ### Not Implemented
 - 8-bit/16-bit mode switching (REP/SEP partially there)
 - Long (24-bit) addressing
-- Multiply/divide (need library calls)
 - Interrupt handling
+
+### Implemented via Library Calls
+- Multiply: `__mulhi3`
+- Signed divide: `__divhi3`
+- Unsigned divide: `__udivhi3`
+- Signed remainder: `__modhi3`
+- Unsigned remainder: `__umodhi3`
+
+Runtime library provided at `src/llvm-project/llvm/lib/Target/W65816/runtime/w65816_runtime.s`
 
 ## Current Work (Jan 2025)
 
@@ -123,6 +131,7 @@ ninja -C build check-llvm
 | `memory.ll` | loads, stores, indirect addressing |
 | `control-flow.ll` | calls, returns, branches |
 | `basic.ll` | basic operations |
+| `mul-div-rem.ll` | multiply, divide, remainder (libcalls) |
 
 ### Writing Tests
 
@@ -158,5 +167,4 @@ make rebuild && ninja -C build check-llvm-codegen-w65816
 
 1. **Fix setcc legalization** - Conditional branches crash (icmp/br patterns)
 2. **8-bit mode switching** - REP/SEP instructions for mode changes
-3. **Multiply/divide support** - Library call expansion
-4. **Assembly parser** - Enable inline asm testing
+3. **Assembly parser** - Enable inline asm testing

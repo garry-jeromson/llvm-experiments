@@ -41,7 +41,8 @@ NC := \033[0m
 
 .PHONY: all help deps clone setup configure build build-fast install \
         scaffold link-backend rebuild tablegen \
-        clean distclean update info list-targets test test-w65816
+        clean distclean update info list-targets test test-w65816 \
+        deps-runtime build-runtime test-runtime clean-runtime
 
 # Default target
 all: help
@@ -80,6 +81,12 @@ help:
 	@echo "  make info          - Show environment information"
 	@echo "  make list-targets  - List available LLVM targets"
 	@echo "  make test          - Run LLVM tests"
+	@echo ""
+	@echo "$(GREEN)W65816 Runtime Library:$(NC)"
+	@echo "  make deps-runtime  - Install cc65 toolchain"
+	@echo "  make build-runtime - Build runtime library (w65816_runtime.o)"
+	@echo "  make test-runtime  - Build runtime test binary"
+	@echo "  make clean-runtime - Clean runtime build files"
 	@echo ""
 	@echo "$(GREEN)Configuration Variables:$(NC)"
 	@echo "  BACKEND_NAME=$(BACKEND_NAME)"
@@ -533,3 +540,58 @@ test-w65816:
 	echo ""; \
 	echo "$(BLUE)Results: $$PASS passed, $$FAIL failed$(NC)"; \
 	if [ $$FAIL -gt 0 ]; then exit 1; fi
+
+# =============================================================================
+# W65816 Runtime Library
+# =============================================================================
+
+RUNTIME_DIR := $(SRC_DIR)/llvm/lib/Target/W65816/runtime
+RUNTIME_BUILD_DIR := $(BUILD_DIR)/w65816-runtime
+
+deps-runtime:
+	@echo "$(BLUE)Installing cc65 toolchain for runtime builds...$(NC)"
+	@if ! command -v ca65 >/dev/null 2>&1; then \
+		echo "Installing cc65..."; \
+		brew install cc65; \
+	else \
+		echo "$(GREEN)cc65 already installed$(NC)"; \
+	fi
+
+build-runtime: deps-runtime
+	@echo "$(BLUE)Building W65816 runtime library...$(NC)"
+	@mkdir -p $(RUNTIME_BUILD_DIR)
+	@ca65 --cpu 65816 -o $(RUNTIME_BUILD_DIR)/w65816_runtime.o $(RUNTIME_DIR)/w65816_runtime.s
+	@echo "$(GREEN)Runtime library built: $(RUNTIME_BUILD_DIR)/w65816_runtime.o$(NC)"
+
+build-runtime-test: deps-runtime
+	@echo "$(BLUE)Building W65816 runtime test suite...$(NC)"
+	@mkdir -p $(RUNTIME_BUILD_DIR)
+	@ca65 --cpu 65816 -o $(RUNTIME_BUILD_DIR)/w65816_runtime.o $(RUNTIME_DIR)/w65816_runtime.s
+	@ca65 --cpu 65816 -o $(RUNTIME_BUILD_DIR)/test_runtime.o $(RUNTIME_DIR)/test_runtime.s
+	@ld65 -o $(RUNTIME_BUILD_DIR)/test_runtime.bin \
+		$(RUNTIME_BUILD_DIR)/test_runtime.o \
+		$(RUNTIME_BUILD_DIR)/w65816_runtime.o \
+		-C $(RUNTIME_DIR)/test_runtime.cfg
+	@echo "$(GREEN)Runtime test built: $(RUNTIME_BUILD_DIR)/test_runtime.bin$(NC)"
+	@echo ""
+	@echo "To run the test:"
+	@echo "  1. Load test_runtime.bin at address 0x8000 in a 65816 emulator"
+	@echo "  2. Execute from 0x8000"
+	@echo "  3. Check memory after halt:"
+	@echo "     0x0000 = Total tests (expect 40)"
+	@echo "     0x0002 = Passed"
+	@echo "     0x0004 = Failed"
+	@echo "     0x0006 = 0x600D (pass) or 0xFA11 (fail)"
+
+test-runtime: build-runtime-test
+	@echo "$(BLUE)Runtime test binary ready at: $(RUNTIME_BUILD_DIR)/test_runtime.bin$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Manual step required:$(NC) Run in a 65816 emulator"
+	@echo "  - Load address: 0x8000"
+	@echo "  - Entry point:  0x8000"
+	@echo "  - Check 0x0006 for result (0x600D = pass, 0xFA11 = fail)"
+
+clean-runtime:
+	@echo "$(BLUE)Cleaning runtime build files...$(NC)"
+	@rm -rf $(RUNTIME_BUILD_DIR)
+	@echo "$(GREEN)Runtime build files cleaned$(NC)"
