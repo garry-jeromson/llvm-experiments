@@ -40,18 +40,18 @@ The backend implements approximately **70-75%** of the W65816 capabilities. The 
 | PC Relative (8-bit) | `BEQ label` | ⚠️ Working, but relaxation to 16-bit BRL incomplete |
 | Direct Page Indexed Y | `LDX $55,Y` | ⚠️ Only for LDX/STX (per W65816 spec) |
 
-### ❌ Not Implemented (8 modes)
+### ❌ Not Implemented (5 modes remaining)
 
 | Mode | Syntax | Description | Priority |
 |------|--------|-------------|----------|
-| Absolute Indirect | `JMP ($1020)` | Jump through pointer | Medium |
-| Absolute Indexed Indirect | `JMP ($2000,X)` | Jump table support | Medium |
+| ~~Absolute Indirect~~ | `JMP ($1020)` | ✅ Jump through pointer - now implemented | ~~Medium~~ |
+| ~~Absolute Indexed Indirect~~ | `JMP ($2000,X)` | ✅ Jump table support - now implemented | ~~Medium~~ |
 | **Absolute Long** | `LDA $02F000` | 24-bit addressing | High |
 | **Absolute Long Indexed X** | `LDA $12D080,X` | 24-bit + X | High |
 | **DP Indirect Long** | `LDA [$55]` | 24-bit via DP | Medium |
 | **DP Indirect Long Idx Y** | `LDA [$55],Y` | 24-bit via DP + Y | Medium |
 | **PC Relative Long** | `BRL label` | 16-bit branch offset | Low |
-| **Block Move** | `MVP $01,$00` | Memory block copy | Low |
+| ~~**Block Move**~~ | `MVP $01,$00` | ✅ Memory block copy - now implemented | ~~Low~~ |
 
 ---
 
@@ -84,8 +84,8 @@ The backend implements approximately **70-75%** of the W65816 capabilities. The 
 
 | Instruction | Description | Priority |
 |-------------|-------------|----------|
-| **MVN** | Block move (increment) | Medium |
-| **MVP** | Block move (decrement) | Medium |
+| ~~**MVN**~~ | ✅ Block move (increment) - now implemented | ~~Medium~~ |
+| ~~**MVP**~~ | ✅ Block move (decrement) - now implemented | ~~Medium~~ |
 | TXY | Transfer X to Y | Low |
 | TYX | Transfer Y to X | Low |
 | TCS | Transfer C to Stack Ptr | Low |
