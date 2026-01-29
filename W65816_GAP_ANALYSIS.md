@@ -78,32 +78,34 @@ The backend implements approximately **70-75%** of the W65816 capabilities. The 
 | BIT | ✅ All modes defined (immediate, absolute, DP, abs+X, DP+X) - instructions can be used via assembly |
 | ASL/LSR/ROL/ROR | ✅ All modes defined (accumulator, DP, DP+X, abs, abs+X) - no selection patterns yet |
 | INC/DEC | ✅ All modes defined (accumulator, absolute, DP, abs+X, DP+X) - memory modes usable via assembly |
-| STZ | ✅ All modes defined (absolute, DP, abs+X, DP+X) - store zero to memory |
+| STZ | ✅ All modes defined (absolute, DP, abs+X, DP+X) - store zero to memory, **selection patterns for abs and abs+X** |
 
 ### ❌ Not Implemented
 
 | Instruction | Description | Priority |
 |-------------|-------------|----------|
-| ~~**MVN**~~ | ✅ Block move (increment) - now implemented | ~~Medium~~ |
-| ~~**MVP**~~ | ✅ Block move (decrement) - now implemented | ~~Medium~~ |
-| TXY | Transfer X to Y | Low |
-| TYX | Transfer Y to X | Low |
-| TCS | Transfer C to Stack Ptr | Low |
-| TSC | Transfer Stack Ptr to C | Low |
-| TCD | Transfer C to Direct Page | Low |
-| TDC | Transfer Direct Page to C | Low |
-| XBA | Exchange B and A | Low |
-| XCE | Exchange Carry/Emulation | Medium (for mode switch) |
-| BRL | Branch long (16-bit) | Low |
-| PEA | Push Effective Address | Low |
-| PEI | Push Effective Indirect | Low |
-| PER | Push Effective Relative | Low |
-| COP | Co-processor | Low |
-| WAI | Wait for Interrupt | Low |
-| STP | Stop Processor | Low |
-| TRB | Test and Reset Bits | Low |
-| TSB | Test and Set Bits | Low |
-| BRK | Software Break | Low |
+| ~~**MVN**~~ | ✅ Block move (increment) - implemented | ~~Medium~~ |
+| ~~**MVP**~~ | ✅ Block move (decrement) - implemented | ~~Medium~~ |
+| ~~TXY~~ | ✅ Transfer X to Y - implemented | ~~Low~~ |
+| ~~TYX~~ | ✅ Transfer Y to X - implemented | ~~Low~~ |
+| ~~TCS~~ | ✅ Transfer C to Stack Ptr - implemented | ~~Low~~ |
+| ~~TSC~~ | ✅ Transfer Stack Ptr to C - implemented | ~~Low~~ |
+| ~~TCD~~ | ✅ Transfer C to Direct Page - implemented | ~~Low~~ |
+| ~~TDC~~ | ✅ Transfer Direct Page to C - implemented | ~~Low~~ |
+| ~~XBA~~ | ✅ Exchange B and A - implemented | ~~Low~~ |
+| ~~XCE~~ | ✅ Exchange Carry/Emulation - already existed | ~~Medium~~ |
+| ~~BRL~~ | ✅ Branch long (16-bit) - already existed | ~~Low~~ |
+| ~~PEA~~ | ✅ Push Effective Address - implemented | ~~Low~~ |
+| ~~PEI~~ | ✅ Push Effective Indirect - implemented | ~~Low~~ |
+| ~~PER~~ | ✅ Push Effective Relative - implemented | ~~Low~~ |
+| ~~COP~~ | ✅ Co-processor - implemented | ~~Low~~ |
+| ~~WAI~~ | ✅ Wait for Interrupt - already existed | ~~Low~~ |
+| ~~STP~~ | ✅ Stop Processor - already existed | ~~Low~~ |
+| ~~TRB~~ | ✅ Test and Reset Bits - implemented | ~~Low~~ |
+| ~~TSB~~ | ✅ Test and Set Bits - implemented | ~~Low~~ |
+| ~~BRK~~ | ✅ Software Break - implemented | ~~Low~~ |
+
+**All W65816 instructions are now defined!** (Jan 2025)
 
 ---
 
@@ -111,10 +113,14 @@ The backend implements approximately **70-75%** of the W65816 capabilities. The 
 
 ### High Priority (Functional Gaps)
 
-1. **Long (24-bit) Addressing**
+1. **Long (24-bit) Addressing** ✅ Mostly Complete (Jan 2025)
    - Required for: Cross-bank code/data access, SNES ROM banking
-   - Missing: JML, JSL patterns, long load/store patterns
-   - Impact: Cannot generate code for multi-bank programs
+   - ✅ Implemented: LDA_long, STA_long for globals in `.fardata`, `.rodata`, `.romdata` sections
+   - ✅ Implemented: LDA_longX, STA_longX for variable-indexed far arrays
+   - ✅ Implemented: Constant offset folding for far globals (`lda rom_table+4`)
+   - ✅ Defined: LDA_dpIndLong, LDA_dpIndLongY, STA_dpIndLong, STA_dpIndLongY
+   - ✅ Already existed: JML, JSL, RTL
+   - Still needed: JSL for addrspace(1) calls, DP indirect long patterns
 
 2. **8-bit Mode Switching**
    - Current: SEP/REP defined but mode tracking incomplete
@@ -143,13 +149,14 @@ The backend implements approximately **70-75%** of the W65816 capabilities. The 
    - Missing absolute and direct page modes
    - Impact: Bit testing without loading to accumulator
 
-### Low Priority (Nice to Have)
+### Low Priority (Nice to Have) ✅ ALL IMPLEMENTED
 
-7. **Inter-register Transfers (TXY, TYX)**
-8. **16-bit Register Transfers (TCS, TSC, TCD, TDC)**
-9. **XBA (byte swap within accumulator)**
-10. **Stack push effective address (PEA, PEI, PER)**
-11. **Test and modify bits (TRB, TSB)**
+7. ~~**Inter-register Transfers (TXY, TYX)**~~ ✅
+8. ~~**16-bit Register Transfers (TCS, TSC, TCD, TDC)**~~ ✅
+9. ~~**XBA (byte swap within accumulator)**~~ ✅
+10. ~~**Stack push effective address (PEA, PEI, PER)**~~ ✅
+11. ~~**Test and modify bits (TRB, TSB)**~~ ✅
+12. ~~**Software interrupts (BRK, COP)**~~ ✅
 
 ---
 
@@ -176,12 +183,16 @@ The backend implements approximately **70-75%** of the W65816 capabilities. The 
 ### Immediate Actions
 1. Complete 8-bit mode support (in progress)
 2. ~~Add memory shift/rotate instructions~~ ✅ DONE (Jan 2025)
-3. Add remaining BIT addressing modes
+3. ~~Add remaining BIT addressing modes~~ ✅ DONE (Jan 2025)
+4. ~~Implement remaining 65816 instructions~~ ✅ DONE (Jan 2025)
 
 ### Future Enhancements
 1. Long addressing for multi-bank support
-2. Block move for memcpy optimization
-3. Jump table support via indirect jumps
+2. ~~Block move for memcpy optimization~~ ✅ MVN/MVP defined
+3. ~~Jump table support via indirect jumps~~ ✅ JMP indirect modes defined
+4. ~~Add selection patterns for new instructions~~ ✅ Partial (Jan 2025)
+   - XBA: maps to `llvm.bswap.i16` intrinsic
+   - STZ: matches `store i16 0` to global variables
 
 ---
 
