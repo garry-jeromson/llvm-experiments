@@ -27,6 +27,7 @@ Location: `src/llvm-project/llvm/lib/Target/W65816/`
 | `W65816ISelLowering.cpp` | DAG lowering |
 | `W65816ISelDAGToDAG.cpp` | DAG instruction selection |
 | `W65816ExpandPseudo.cpp` | Pseudo-instruction expansion |
+| `W65816PeepholeOpt.cpp` | Peephole optimizations (eliminates redundant transfers) |
 | `W65816FrameLowering.cpp` | Stack frame management |
 
 ## Build Commands
@@ -317,7 +318,7 @@ Stack Relative Indirect Y, Absolute Indirect, Absolute Indexed Indirect, Long, L
    - ✅ switch.ll - Switch statements (branch chains)
 3. ~~**Code generation audit**~~ - ✅ Done, findings:
    - ✅ AND/OR/XOR DP optimization implemented
-   - ⚠️ Redundant `tax; txa` after shifts (register allocation artifact, low priority)
+   - ✅ Redundant `tax; txa` / `tay; tya` eliminated by peephole pass
    - ⚠️ Signed select has complex branch sequences (inherent to signed compare on 65816)
 4. ~~**Clang integration testing**~~ - ✅ Done: C → LLVM IR → W65816 works!
    - Use MSP430 target for Clang (`-target msp430-unknown-none -O2`), then change triple
