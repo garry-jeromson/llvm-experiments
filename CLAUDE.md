@@ -72,6 +72,7 @@ make rebuild && ninja -C build check-llvm-codegen-w65816
 | `basic.ll` | basic operations |
 | `mul-div-rem.ll` | multiply, divide, remainder (libcalls) |
 | `interrupt.ll` | interrupt handler support (RTI, register save/restore) |
+| `varargs.ll` | variadic function support |
 
 ---
 
@@ -118,6 +119,7 @@ make rebuild && ninja -C build check-llvm-codegen-w65816
 - Stack frame management (prologue/epilogue)
 - Register spilling via LDA_sr/STA_sr
 - First 3 args in A, X, Y; additional args on stack
+- Varargs support (va_start, va_arg, va_end, va_copy)
 
 **Code Generation:**
 - MC layer with ELF object generation
@@ -152,10 +154,9 @@ make rebuild && ninja -C build check-llvm-codegen-w65816
 ## Remaining Work
 
 ### Low Priority
-1. **Vararg Support** - For printf-style functions
-2. **32-bit Returns** - Test and fix A:X pair returns
-3. **`$` Hex Prefix** - Add support for `$FF` syntax (currently requires `0xFF`)
-4. **ROL/ROR Memory** - Memory rotate patterns (INC/DEC/ASL/LSR done)
+1. **32-bit Returns** - Test and fix A:X pair returns
+2. **`$` Hex Prefix** - Add support for `$FF` syntax (currently requires `0xFF`)
+3. **ROL/ROR Memory** - Memory rotate patterns (INC/DEC/ASL/LSR done)
 
 ---
 
