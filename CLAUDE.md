@@ -87,9 +87,9 @@ define i16 @test_main() {
 ```
 
 **Current Limitations:**
-- Tests with internal function calls require relocation (not yet supported)
-- Tests with global variables require relocation (not yet supported)
-- Tests with phi nodes may fail due to register pressure or compiler hangs
+- Tests with internal function calls require relocation (supported)
+- Tests with global variables require relocation (supported)
+- Complex phi nodes with high register pressure may generate suboptimal code
 
 ### Test Files
 
@@ -136,6 +136,43 @@ Location: `test/integration/tests/`
 | `sext.ll`, `zext.ll`, `trunc.ll` | Type conversions |
 | `store-load.ll` | Memory operations |
 | `zero.ll`, `large-immediate.ll` | Boundary values |
+
+### Integration Test Architecture
+
+**Test Format**
+
+Tests in `test/integration/tests/*.ll`:
+- `; INTEGRATION-TEST` - marks file as an integration test
+- `; EXPECT: N` - expected return value (i16)
+- `; SKIP: reason` - skip test with reason (optional)
+- `define i16 @test_main()` - required entry point
+
+**Compilation Pipeline**
+
+1. `llc -march=w65816 -filetype=obj` → ELF object file
+2. Parse ELF sections (`.text`, `.data`) and symbol table
+3. Apply relocations (`R_W65816_16`, `R_W65816_24`)
+4. Build ROM image with startup code at $8000
+5. Execute in 816CE CPU emulator
+6. Compare result at $0000 with EXPECT value
+
+**Memory Layout**
+
+| Address | Content |
+|---------|---------|
+| $0000-$00FF | Zero page (result stored at $0000) |
+| $0100-$01FF | Stack |
+| $8000 | Startup code: `CLC, XCE, REP #$30, LDX #$01FF, TXS, JSR test_main, STA $00, STP` |
+| $800E+ | Test code and data |
+| $FFFC | Reset vector → $8000 |
+
+**Relocation Support**
+
+The test runner applies relocations to link symbols:
+- `R_W65816_16`: 16-bit absolute address
+- `R_W65816_24`: 24-bit long address (bank + offset)
+
+This allows tests with function calls and global variables to work correctly.
 
 ---
 
@@ -187,6 +224,7 @@ Location: `test/integration/tests/`
 - Varargs support (va_start, va_arg, va_end, va_copy)
 
 **Code Generation:**
+- Native Clang target: `clang -target w65816-unknown-none` (no MSP430 proxy needed)
 - MC layer with ELF object generation
 - Runtime library for MUL/DIV/REM (`runtime/w65816_runtime.s`)
 - Motorola-style integers in inline assembly: `$FF` (hex), `%11110000` (binary)
@@ -205,10 +243,8 @@ Location: `test/integration/tests/`
   - Workaround: Order function arguments so value is first (in A) and index is second (in X)
 
 **Phi Node Issues:**
-- Phi nodes with conditional branches may generate incorrect code (loads result before comparison)
-- Workaround: Use `select` instruction instead of phi nodes for conditional values
-- Constant comparisons (e.g., `icmp eq i16 1, 1`) can cause infinite loops in instruction selection
-- Workaround: Use `opt -O2` before `llc` to fold constants, or use parameter-based comparisons
+- Complex phi nodes with high register pressure may generate suboptimal code
+- Workaround: Use `select` instruction instead of phi nodes for conditional values when possible
 
 **Suboptimal Code Generation:**
 - Self-comparison generates unnecessary code
@@ -407,17 +443,16 @@ lda 3,s    ; 2-byte Folded Reload
 ### Compiling C Code
 
 ```bash
-# Step 1: Compile C to LLVM IR using MSP430 target (16-bit)
-./build/bin/clang -target msp430-unknown-none -O2 -S -emit-llvm test.c -o test.ll
+# Compile C directly to W65816 assembly
+./build/bin/clang -target w65816-unknown-none -O2 -S test.c -o test.s
 
-# Step 2: Fix the target triple (manual step or use sed)
-sed -i '' 's/msp430-unknown-none/w65816-unknown-none/g' test.ll
+# Compile C to LLVM IR
+./build/bin/clang -target w65816-unknown-none -O2 -S -emit-llvm test.c -o test.ll
 
-# Step 3: Compile IR to W65816 assembly
-./build/bin/llc -march=w65816 test.ll -o test.s
-
-# Or generate object file
-./build/bin/llc -march=w65816 -filetype=obj test.ll -o test.o
+# Generate object file directly
+./build/bin/clang -target w65816-unknown-none -O2 -c test.c -o test.o
 ```
 
 **Note:** Use `-O2` optimization to avoid alloca-based code that causes register pressure issues.
+
+**Predefined Macros:** The Clang target defines `__W65816__` and `W65816`.
