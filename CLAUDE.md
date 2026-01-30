@@ -248,7 +248,7 @@ This allows tests with function calls and global variables to work correctly.
 - Workaround: Use `select` instruction instead of phi nodes for conditional values when possible
 
 **Suboptimal Code Generation:**
-- Self-comparison generates unnecessary code
+- Conditional branches may have suboptimal block layout (mitigated by peephole pass)
 
 **Semantic Mismatches:**
 - Memory ROL/ROR cannot be optimized because W65816's ROL/ROR are "rotate through carry"
