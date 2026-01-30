@@ -28,7 +28,6 @@ Location: `src/llvm-project/llvm/lib/Target/W65816/`
 | `W65816ISelDAGToDAG.cpp` | DAG instruction selection |
 | `W65816ExpandPseudo.cpp` | Pseudo-instruction expansion |
 | `W65816FrameLowering.cpp` | Stack frame management |
-| `KNOWN_LIMITATIONS.md` | Documented limitations |
 
 ## Build Commands
 
@@ -38,74 +37,14 @@ make rebuild       # Incremental rebuild after changes
 
 # Compile test
 ./build/bin/llc -march=w65816 test_file.ll -o -
+
+# Generate object file
+./build/bin/llc -march=w65816 -filetype=obj test_file.ll -o test_file.o
 ```
-
-## W65816 Architecture Quick Reference
-
-- **Registers**: A (accumulator), X, Y (index), SP (stack), D (direct page)
-- **Data size**: 8-bit or 16-bit (mode switchable)
-- **Pointers**: 16-bit (bank 0) or 24-bit (with bank register)
-- **Key addressing modes**:
-  - Absolute: `lda addr`
-  - Stack-relative: `lda n,s`
-  - Indexed: `lda addr,x` / `lda addr,y`
-  - Direct page: `lda dp`
-  - Indirect: `lda (dp)` / `lda (dp),y` / `lda (n,s),y`
-
-## Implementation Status
-
-### Completed (~75%)
-- Register file with 8/16-bit subregs
-- Load/store: LDA, STA, LDX, LDY, STX, STY (multiple addressing modes)
-- Arithmetic: ADC, SBC, INC, DEC
-- Logical: AND, ORA, EOR
-- Shifts: ASL, LSR, ROL, ROR
-- Branches: BNE, BEQ, BCS, BCC, BMI, BPL, BVS, BRA
-- Calls: JSR, RTS
-- Stack operations: PHA, PLA, PHX, PLX, PHY, PLY
-- Signed/unsigned comparisons
-- Stack frame management (prologue/epilogue)
-- Indirect addressing (via stack-relative indirect)
-- MC layer with ELF object generation
-
-### Known Issues
-- **8-bit loads with address math**: Causes issues with pointer loads (double deref fails)
-- **Limited registers**: Only A, X, Y available; complex operations may run out
-- **No 8/16-bit mode switching** implemented yet
-
-### Not Implemented
-- 8-bit/16-bit mode switching (REP/SEP partially there)
-- Long (24-bit) addressing
-- Assembly parser (for inline asm)
-
-### Implemented via Library Calls
-- Multiply: `__mulhi3`
-- Signed divide: `__divhi3`
-- Unsigned divide: `__udivhi3`
-- Signed remainder: `__modhi3`
-- Unsigned remainder: `__umodhi3`
-
-Runtime library provided at `src/llvm-project/llvm/lib/Target/W65816/runtime/w65816_runtime.s`
-
-## Current Work (Jan 2025)
-
-### Indirect Addressing - FIXED ✓
-
-All indirect addressing modes now work:
-- `*ptr` load/store ✓
-- `ptr[i]` with constant index ✓
-- `ptr[i]` with variable index ✓
-- `**ptr` double dereference ✓
-
-**Fix applied:** Changed data layout from `p:16:8` to `p:16:16` (16-bit pointer alignment) to prevent LLVM from decomposing 16-bit pointer loads into 8-bit loads.
 
 ## Testing
 
 **IMPORTANT: All changes must pass tests before committing.**
-
-Tests are located in `src/llvm-project/llvm/test/CodeGen/W65816/` and use LLVM's standard FileCheck infrastructure.
-
-### Running Tests
 
 ```bash
 # Run W65816 tests only (REQUIRED after every change)
@@ -114,11 +53,8 @@ ninja -C build check-llvm-codegen-w65816
 # Alternative using make
 make test-w65816
 
-# Run all CodeGen tests (includes W65816)
-ninja -C build check-llvm-codegen
-
-# Run full LLVM test suite
-ninja -C build check-llvm
+# Workflow after making changes:
+make rebuild && ninja -C build check-llvm-codegen-w65816
 ```
 
 ### Test Files
@@ -129,43 +65,167 @@ ninja -C build check-llvm
 | `logical.ll` | and, or, xor |
 | `shifts.ll` | constant and variable shifts |
 | `memory.ll` | loads, stores, indirect addressing |
+| `dp-indirect.ll` | direct page indirect addressing |
 | `control-flow.ll` | calls, returns, branches |
+| `select.ll` | conditional select (signed/unsigned comparisons) |
 | `basic.ll` | basic operations |
 | `mul-div-rem.ll` | multiply, divide, remainder (libcalls) |
 | `interrupt.ll` | interrupt handler support (RTI, register save/restore) |
 
-### Writing Tests
+---
 
-Tests use FileCheck directives:
-```llvm
-; RUN: llc -march=w65816 < %s | FileCheck %s
+## W65816 Architecture Quick Reference
 
-; CHECK-LABEL: function_name:
-; CHECK: expected_instruction
-define i16 @function_name(i16 %a) {
-  ; ... IR ...
+- **Registers**: A (accumulator), X, Y (index), SP (stack), D (direct page)
+- **Data size**: 8-bit or 16-bit (mode switchable via M/X flags)
+- **Pointers**: 16-bit (bank 0) or 24-bit (with bank register)
+- **Key addressing modes**:
+  - Absolute: `lda addr`
+  - Stack-relative: `lda n,s`
+  - Indexed: `lda addr,x` / `lda addr,y`
+  - Direct page: `lda dp`
+  - Indirect: `lda (dp)` / `lda (dp),y` / `lda (n,s),y`
+  - Long: `lda $123456` (24-bit)
+
+---
+
+## Implementation Status
+
+### What Works
+
+**Core Operations:**
+- Register file with 8/16-bit subregs
+- Arithmetic: ADC, SBC, INC, DEC (+ library calls for MUL, DIV, REM)
+- Logical: AND, ORA, EOR
+- Shifts: ASL, LSR, ROL, ROR (constant and variable amounts)
+- All comparison conditions (signed and unsigned, including compound UGT/ULE)
+
+**Memory & Addressing:**
+- Load/store: LDA, STA, LDX, LDY, STX, STY
+- Absolute, stack-relative, indexed (X and Y), direct page
+- Long (24-bit) addressing for `.fardata`, `.rodata`, `.romdata` sections
+- Pointer dereference via stack-relative indirect `(n,s),y`
+- Direct page indirect `($dp)` and `($dp),y` for efficient pointer access in zero page
+- 8-bit loads/stores with automatic SEP/REP mode switching
+
+**Control Flow:**
+- Branches: BNE, BEQ, BCS, BCC, BMI, BPL, BVS, BVC, BRA
+- Calls: JSR, RTS, RTI
+- Interrupt handlers with `__attribute__((interrupt))`
+
+**Stack & ABI:**
+- Stack frame management (prologue/epilogue)
+- Register spilling via LDA_sr/STA_sr
+- First 3 args in A, X, Y; additional args on stack
+
+**Code Generation:**
+- MC layer with ELF object generation
+- Runtime library for MUL/DIV/REM (`runtime/w65816_runtime.s`)
+- Assembly parser with all indirect addressing modes:
+  - `(dp)`, `(dp),y`, `(dp,x)` - DP indirect
+  - `[dp]`, `[dp],y` - DP indirect long
+  - `(n,s),y` - Stack relative indirect
+  - `(addr)`, `(addr,x)`, `[addr]` - JMP indirect
+
+### Known Limitations
+
+**Register Pressure:**
+- Only A, X, Y available for general use
+- Complex phi nodes with high register pressure may fail
+- Indexed stores with conflicting argument order may generate incorrect code
+  - Workaround: Order function arguments so value is first (in A) and index is second (in X)
+
+**Suboptimal Code Generation:**
+- ADD16rr/SUB16rr uses stack-relative addressing (push, operate, pull overhead)
+- Self-comparison generates unnecessary code
+- Memory shift/rotate/inc/dec instructions are defined but no selection patterns (uses load-op-store)
+
+**Not Implemented:**
+- Vararg support
+- 32-bit return values (A:X pair) untested
+- Runtime 8/16-bit mode switching (compile-time flags only)
+- `$` hex prefix in assembly (use `0x` instead)
+
+---
+
+## Remaining Work
+
+### Medium Priority
+1. **Memory Operations** - Add patterns for in-place shift/rotate/inc/dec on memory
+
+### Low Priority
+2. **Vararg Support** - For printf-style functions
+3. **32-bit Returns** - Test and fix A:X pair returns
+4. **`$` Hex Prefix** - Add support for `$FF` syntax (currently requires `0xFF`)
+
+---
+
+## Feature Reference
+
+### 8/16-bit Mode (Compile-Time)
+
+```bash
+llc -march=w65816 test.ll                    # 16-bit mode (default)
+llc -march=w65816 -mattr=+acc8bit test.ll    # 8-bit accumulator
+llc -march=w65816 -mattr=+idx8bit test.ll    # 8-bit index registers
+```
+
+### Long Addressing
+
+Globals in these sections use 24-bit addressing:
+- `.fardata`, `.rodata`, `.romdata`, `.bank*`
+
+### Interrupt Handlers
+
+```c
+__attribute__((interrupt))
+void irq_handler(void) {
+    // Prologue: rep #48, pha, phx, phy
+    // Epilogue: rep #48, ply, plx, pla, rti
 }
 ```
 
-### Workflow
+### Runtime Library
 
 ```bash
-# After making changes:
-make rebuild && ninja -C build check-llvm-codegen-w65816
+# Assemble runtime library
+ca65 --cpu 65816 -o w65816_runtime.o src/llvm-project/llvm/lib/Target/W65816/runtime/w65816_runtime.s
+
+# Link with your code
 ```
 
-## Manual Testing
+Provides: `__mulhi3`, `__divhi3`, `__udivhi3`, `__modhi3`, `__umodhi3`
 
-```bash
-# Compile and view assembly
-./build/bin/llc -march=w65816 test_file.ll -o -
+---
 
-# Generate object file
-./build/bin/llc -march=w65816 -filetype=obj test_file.ll -o test_file.o
+## Code Generation Examples
+
+### Array Access
+```asm
+; array_load(i16 %idx):
+asl a               ; idx * 2
+tax                 ; put index in X
+lda global_array,x  ; indexed load
+rts
 ```
 
-## Next Steps
+### Direct Page (Zero Page)
+```llvm
+@zp_var = global i16 42, section ".zeropage"
+; Generates 2-byte instructions (opcode 0xA5/0x85)
+```
 
-1. **Fix setcc legalization** - Conditional branches crash (icmp/br patterns)
-2. **8-bit mode switching** - REP/SEP instructions for mode changes
-3. **Assembly parser** - Enable inline asm testing
+### Direct Page Indirect (Pointer in Zero Page)
+```llvm
+@dp_ptr = global ptr null, section ".zeropage"
+; Dereferencing uses efficient ($dp) addressing:
+;   lda (dp_ptr)     ; load through DP pointer
+;   sta (dp_ptr)     ; store through DP pointer
+;   lda (dp_ptr),y   ; indexed load: ptr[i]
+```
+
+### Stack Spills
+```asm
+sta 3,s    ; 2-byte Folded Spill
+lda 3,s    ; 2-byte Folded Reload
+```
