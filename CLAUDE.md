@@ -144,7 +144,6 @@ make rebuild && ninja -C build check-llvm-codegen-w65816
   - Workaround: Order function arguments so value is first (in A) and index is second (in X)
 
 **Suboptimal Code Generation:**
-- ADD16rr/SUB16rr uses stack-relative addressing (push, operate, pull overhead)
 - Self-comparison generates unnecessary code
 
 **Semantic Mismatches:**
@@ -161,7 +160,7 @@ make rebuild && ninja -C build check-llvm-codegen-w65816
 ## Remaining Work
 
 ### Optimization & Polish
-1. **ADD16rr/SUB16rr optimization** - Use DP scratch location instead of stack push/pop (minor speedup, requires reserving DP bytes)
+1. ~~**ADD16rr/SUB16rr optimization**~~ - ✅ Done: Uses DP scratch at $FE (saves 4 cycles per operation)
 2. **Test coverage expansion** - Add more edge case tests and stress tests
 3. **Code generation audit** - Analyze generated code for common patterns and identify optimization opportunities
 4. **Clang integration testing** - Test compiling actual C code through the full toolchain
