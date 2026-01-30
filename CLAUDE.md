@@ -170,6 +170,7 @@ make rebuild && ninja -C build check-llvm-codegen-w65816
 
 ### Optimization & Polish
 1. ~~**ADD16rr/SUB16rr optimization**~~ - ✅ Done: Uses DP scratch at $FE (saves 4 cycles per operation)
+1b. ~~**AND16rr/OR16rr/XOR16rr optimization**~~ - ✅ Done: Uses DP scratch at $FE (saves 4 cycles per operation)
 2. ~~**Test coverage expansion**~~ - ✅ Done:
    - ✅ edge-cases.ll - Zero/max values, boundary conditions
    - ✅ complex-control-flow.ll - Nested calls, loops, phi nodes
@@ -180,7 +181,10 @@ make rebuild && ninja -C build check-llvm-codegen-w65816
    - ✅ special-instructions.ll - BIT, XBA, TXY/TYX, PEA, SEP/REP, etc.
    - ✅ global-data.ll - Initialized arrays, struct access, const data
    - ✅ switch.ll - Switch statements (branch chains)
-3. **Code generation audit** - Analyze generated code for common patterns and identify optimization opportunities
+3. ~~**Code generation audit**~~ - ✅ Done, findings:
+   - ✅ AND/OR/XOR DP optimization implemented
+   - ⚠️ Redundant `tax; txa` after shifts (register allocation artifact, low priority)
+   - ⚠️ Signed select has complex branch sequences (inherent to signed compare on 65816)
 4. **Clang integration testing** - Test compiling actual C code through the full toolchain
 5. **Runtime library expansion** - Add more library functions (64-bit math, memcpy, etc.)
 6. **Documentation polish** - Add more examples, usage guides
