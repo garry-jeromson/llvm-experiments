@@ -191,8 +191,10 @@ make rebuild && ninja -C build check-llvm-codegen-w65816
    - Multiply/divide require runtime library (as expected)
    - Example: `clang -target msp430-unknown-none -O2 -S -emit-llvm test.c -o test.ll`
      then edit triple and run `llc -march=w65816 test.ll`
-5. **Runtime library expansion** - Add more library functions (64-bit math, memcpy, etc.)
-6. **Documentation polish** - Add more examples, usage guides
+5. **Runtime library expansion** - Optional future work
+   - Current: __mulhi3, __divhi3, __udivhi3, __modhi3, __umodhi3
+   - Potential additions: memcpy, memset, 32-bit math (if needed)
+6. ~~**Documentation polish**~~ - ✅ Done: Added C compilation workflow
 
 ### Not Planned (Significant Effort)
 - **32-bit Integer Support** - Would require full type legalization for i32→i16 pairs, paired register handling for A:X returns, and 32-bit arithmetic via 16-bit pairs. Use library functions or manual 16-bit pairs instead.
@@ -289,3 +291,21 @@ rts
 sta 3,s    ; 2-byte Folded Spill
 lda 3,s    ; 2-byte Folded Reload
 ```
+
+### Compiling C Code
+
+```bash
+# Step 1: Compile C to LLVM IR using MSP430 target (16-bit)
+./build/bin/clang -target msp430-unknown-none -O2 -S -emit-llvm test.c -o test.ll
+
+# Step 2: Fix the target triple (manual step or use sed)
+sed -i '' 's/msp430-unknown-none/w65816-unknown-none/g' test.ll
+
+# Step 3: Compile IR to W65816 assembly
+./build/bin/llc -march=w65816 test.ll -o test.s
+
+# Or generate object file
+./build/bin/llc -march=w65816 -filetype=obj test.ll -o test.o
+```
+
+**Note:** Use `-O2` optimization to avoid alloca-based code that causes register pressure issues.
