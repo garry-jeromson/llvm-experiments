@@ -42,7 +42,8 @@ NC := \033[0m
 .PHONY: all help deps clone setup configure build build-fast install \
         scaffold link-backend rebuild tablegen \
         clean distclean update info list-targets test test-w65816 \
-        deps-runtime build-runtime test-runtime clean-runtime
+        deps-runtime build-runtime test-runtime clean-runtime \
+        build-test-runner test-integration
 
 # Default target
 all: help
@@ -87,6 +88,11 @@ help:
 	@echo "  make build-runtime - Build runtime library (w65816_runtime.o)"
 	@echo "  make test-runtime  - Build runtime test binary"
 	@echo "  make clean-runtime - Clean runtime build files"
+	@echo ""
+	@echo "$(GREEN)W65816 Integration Testing:$(NC)"
+	@echo "  make build-test-runner  - Build 816CE-based CPU emulator runner"
+	@echo "  make test-integration   - Run integration tests (compile IR, execute)"
+	@echo "  make test-integration-verbose - Run with verbose output"
 	@echo ""
 	@echo "$(GREEN)Configuration Variables:$(NC)"
 	@echo "  BACKEND_NAME=$(BACKEND_NAME)"
@@ -595,3 +601,38 @@ clean-runtime:
 	@echo "$(BLUE)Cleaning runtime build files...$(NC)"
 	@rm -rf $(RUNTIME_BUILD_DIR)
 	@echo "$(GREEN)Runtime build files cleaned$(NC)"
+
+# =============================================================================
+# W65816 Integration Testing
+# =============================================================================
+
+RUNNER_DIR := $(ROOT_DIR)/tools/w65816-runner
+RUNNER_BIN := $(BUILD_DIR)/bin/w65816-runner
+CPU_DIR := $(ROOT_DIR)/tools/816ce/src/cpu
+
+build-test-runner: deps-runtime
+	@echo "$(BLUE)Building W65816 integration test runner...$(NC)"
+	@if [ ! -d "$(CPU_DIR)" ]; then \
+		echo "$(RED)Error: 816CE not found. Clone it to tools/816ce$(NC)"; \
+		exit 1; \
+	fi
+	@mkdir -p $(BUILD_DIR)/bin
+	@$(CC) -o $(RUNNER_BIN) \
+		$(RUNNER_DIR)/main.c \
+		$(CPU_DIR)/65816.c \
+		$(CPU_DIR)/65816-util.c \
+		$(CPU_DIR)/65816-ops.c \
+		-I$(CPU_DIR) \
+		-std=c99 -O2 -Wall
+	@echo "$(GREEN)Test runner built: $(RUNNER_BIN)$(NC)"
+
+test-integration: build-test-runner
+	@echo "$(BLUE)Running W65816 integration tests...$(NC)"
+	@if [ ! -x "$(RUNNER_BIN)" ]; then \
+		echo "$(RED)Error: Test runner not built. Run 'make build-test-runner' first.$(NC)"; \
+		exit 1; \
+	fi
+	@python3 $(RUNNER_DIR)/run-tests.py -b $(BUILD_DIR) -r $(RUNNER_DIR)
+
+test-integration-verbose: build-test-runner
+	@python3 $(RUNNER_DIR)/run-tests.py -b $(BUILD_DIR) -r $(RUNNER_DIR) -v

@@ -57,6 +57,40 @@ make test-w65816
 make rebuild && ninja -C build check-llvm-codegen-w65816
 ```
 
+### Integration Tests (Execution Verification)
+
+Integration tests compile LLVM IR to machine code and execute it in a CPU emulator (816CE)
+to verify the generated code produces correct results.
+
+```bash
+# Build the test runner (uses 816CE CPU emulator)
+make build-test-runner
+
+# Run integration tests
+make test-integration
+
+# Verbose output
+make test-integration-verbose
+```
+
+Test files are in `test/integration/tests/*.ll` with format:
+```llvm
+; INTEGRATION-TEST
+; EXPECT: 42
+; SKIP: reason (optional, to skip a test)
+
+target triple = "w65816-unknown-none"
+
+define i16 @test_main() {
+  ret i16 42
+}
+```
+
+**Current Limitations:**
+- Tests with internal function calls require relocation (not yet supported)
+- Tests with global variables require relocation (not yet supported)
+- Tests with phi nodes may fail due to register pressure or compiler hangs
+
 ### Test Files
 
 | File | Coverage |
@@ -87,6 +121,21 @@ make rebuild && ninja -C build check-llvm-codegen-w65816
 | `special-instructions.ll` | BIT, XBA, TXY/TYX, PEA, SEP/REP |
 | `global-data.ll` | Initialized arrays, struct access, const data |
 | `switch.ll` | Switch statements (branch chains) |
+
+### Integration Test Files
+
+Location: `test/integration/tests/`
+
+| File | Tests |
+|------|-------|
+| `add.ll`, `sub.ll`, `inc.ll`, `dec.ll` | Arithmetic operations |
+| `and.ll`, `or.ll`, `xor.ll` | Logical operations |
+| `shl.ll`, `lshr.ll`, `ashr.ll` | Shift operations |
+| `icmp-*.ll` | Comparisons (eq, ne, slt, sgt, ult, ugt) |
+| `select.ll` | Conditional select |
+| `sext.ll`, `zext.ll`, `trunc.ll` | Type conversions |
+| `store-load.ll` | Memory operations |
+| `zero.ll`, `large-immediate.ll` | Boundary values |
 
 ---
 
