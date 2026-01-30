@@ -67,13 +67,23 @@ def fix_llvm_asm_for_ca65(asm_path: str) -> str:
             # For simplicity, just skip alignment directives
             continue
 
-        # Skip LLVM local labels (starting with .L)
+        # Convert LLVM local labels (starting with .L) to ca65 format
+        # ca65 doesn't like dots in label names, so remove the leading dot
         if stripped.startswith('.L') and stripped.endswith(':'):
+            # .LBB0_1: -> LBB0_1:
+            label = stripped[1:]  # Remove leading dot
+            lines.append(label)
             continue
 
-        # Skip lines that reference .L labels (like jumps to them)
-        # Actually, we should convert these, but for now skip
-        if '.Lfunc_end' in stripped or '.LBB' in stripped:
+        # Skip .Lfunc_end labels (function size markers not needed)
+        if '.Lfunc_end' in stripped:
+            continue
+
+        # Convert references to .LBB labels in branch instructions
+        # e.g., "bra .LBB0_1" -> "bra LBB0_1"
+        if '.LBB' in stripped:
+            line = line.replace('.LBB', 'LBB')
+            lines.append(line)
             continue
 
         # Convert .section to ca65 .segment
@@ -233,16 +243,29 @@ def build(source_file: str, output_sfc: str):
         str(project_root / "snes" / "crt0.s")
     ], "Running ca65 on crt0")
 
+    # Step 6b: Assemble font data
+    print("\nStep 6b: Assemble font data")
+    font_obj = build_dir / "font.o"
+    font_path = project_root / "snes" / "font.s"
+    if font_path.exists():
+        run([
+            "ca65", "--cpu", "65816",
+            "-o", str(font_obj),
+            str(font_path)
+        ], "Running ca65 on font")
+        link_objects = [str(crt0_obj), str(font_obj), str(user_obj)]
+    else:
+        print("  No font.s found, skipping font assembly")
+        link_objects = [str(crt0_obj), str(user_obj)]
+
     # Step 7: Link
     print("\nStep 7: Link ROM")
     output_path = Path(output_sfc).resolve()
     run([
         "ld65",
         "-C", str(project_root / "snes" / "lorom.cfg"),
-        "-o", str(output_path),
-        str(crt0_obj),
-        str(user_obj)
-    ], "Running ld65")
+        "-o", str(output_path)
+    ] + link_objects, "Running ld65")
 
     # Step 8: Fix checksum
     print("\nStep 8: Fix ROM checksum")

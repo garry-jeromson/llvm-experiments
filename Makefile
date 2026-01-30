@@ -658,6 +658,12 @@ build-snes-demo: deps-runtime
 	@python3 $(SNES_BUILDER)/build_rom.py $(SNES_DIR)/demo.c $(SNES_BUILD_DIR)/demo.sfc
 	@echo "$(GREEN)SNES ROM built: $(SNES_BUILD_DIR)/demo.sfc$(NC)"
 
+build-snes-text-demo: deps-runtime
+	@echo "$(BLUE)Building SNES text demo ROM...$(NC)"
+	@mkdir -p $(SNES_BUILD_DIR)
+	@python3 $(SNES_BUILDER)/build_rom.py $(SNES_DIR)/text_demo.c $(SNES_BUILD_DIR)/text_demo.sfc
+	@echo "$(GREEN)SNES text demo ROM built: $(SNES_BUILD_DIR)/text_demo.sfc$(NC)"
+
 build-snes-test:
 	@echo "$(BLUE)Building standalone SNES test ROM (pure assembly)...$(NC)"
 	@mkdir -p $(SNES_BUILD_DIR)
@@ -667,9 +673,17 @@ build-snes-test:
 	@echo "$(GREEN)Test ROM built: $(SNES_BUILD_DIR)/test.sfc$(NC)"
 
 run-snes-demo: build-snes-demo
-	@echo "$(BLUE)Opening SNES ROM in default emulator...$(NC)"
-	@open $(SNES_BUILD_DIR)/demo.sfc
+	@python3 $(SNES_BUILDER)/run_rom.py $(SNES_BUILD_DIR)/demo.sfc
+
+run-snes-text-demo: build-snes-text-demo
+	@python3 $(SNES_BUILDER)/run_rom.py $(SNES_BUILD_DIR)/text_demo.sfc
 
 run-snes-test: build-snes-test
-	@echo "$(BLUE)Opening SNES test ROM in default emulator...$(NC)"
-	@open $(SNES_BUILD_DIR)/test.sfc
+	@python3 $(SNES_BUILDER)/run_rom.py $(SNES_BUILD_DIR)/test.sfc
+
+# Run with specific emulator: make run-snes-text-demo-snes9x
+run-snes-demo-snes9x: build-snes-demo
+	@python3 $(SNES_BUILDER)/run_rom.py -e snes9x $(SNES_BUILD_DIR)/demo.sfc
+
+run-snes-text-demo-snes9x: build-snes-text-demo
+	@python3 $(SNES_BUILDER)/run_rom.py -e snes9x $(SNES_BUILD_DIR)/text_demo.sfc

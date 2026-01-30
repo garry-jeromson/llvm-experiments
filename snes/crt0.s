@@ -7,6 +7,9 @@
 ; Import main function from LLVM-compiled code
 .import main
 
+; Import font data from font.s
+.import font_data, font_data_size
+
 ; Export entry point
 .export reset, nmi_handler, irq_handler
 
@@ -75,6 +78,47 @@ reset:
     dex
     bne @clear_oam
 
+    ; === GRAPHICS MODE SETUP ===
+    ; Set Mode 0 (4 backgrounds, 2bpp each)
+    lda #$00
+    sta $2105               ; BGMODE = 0
+
+    ; BG1 tilemap at VRAM $1000 (address bits 15-10 = $04, 32x32 tiles)
+    lda #$10                ; ($1000 >> 9) | size=0
+    sta $2107               ; BG1SC
+
+    ; BG1 character data at VRAM $0000
+    lda #$00
+    sta $210B               ; BG12NBA (BG1 uses low nibble)
+
+    ; Load font into VRAM at $0000
+    jsr load_font
+
+    ; Set text palette (entries 0-3 for 2bpp)
+    stz $2121               ; CGRAM address 0
+    ; Color 0: Black (background)
+    stz $2122
+    stz $2122
+    ; Color 1: White (text foreground)
+    lda #$FF
+    sta $2122
+    lda #$7F
+    sta $2122
+    ; Color 2: Gray (unused)
+    lda #$10
+    sta $2122
+    lda #$42
+    sta $2122
+    ; Color 3: Gray (unused)
+    lda #$10
+    sta $2122
+    lda #$42
+    sta $2122
+
+    ; Enable BG1 on main screen
+    lda #$01
+    sta $212C               ; TM = BG1 enabled
+
     ; Set up registers for 16-bit mode
     rep #$30                ; 16-bit A/X/Y
     .a16
@@ -87,6 +131,41 @@ reset:
 forever:
     wai                     ; Wait for interrupt
     bra forever
+
+
+; Load font data into VRAM at $0000
+; Called with 8-bit A mode
+load_font:
+    php                     ; Save processor status
+    rep #$20                ; 16-bit A
+    .a16
+
+    ; Set VRAM address to $0000
+    lda #$0000
+    sta $2116               ; VMADDL/VMADDH
+
+    ; Set up for word writes, increment on high byte write
+    sep #$20
+    .a8
+    lda #$80
+    sta $2115               ; VMAIN
+
+    rep #$20
+    .a16
+
+    ; Copy font data to VRAM
+    ; Font is in RODATA segment, accessible via long addressing
+    ldx #0
+@font_loop:
+    lda font_data,x
+    sta $2118               ; VMDATAL/VMDATAH (16-bit write)
+    inx
+    inx
+    cpx #font_data_size
+    bcc @font_loop
+
+    plp                     ; Restore processor status
+    rts
 
 
 ; NMI Handler (VBlank)
@@ -108,7 +187,8 @@ irq_handler:
     .byte $00               ; $FFBF: Cartridge sub-type
 
     ; $FFC0-$FFD4: Game title (21 bytes, padded with spaces)
-    .byte "LLVM W65816 DEMO     "
+    .byte "LLVM W65816 DEMO"    ; 16 bytes
+    .byte "     "               ; 5 spaces = 21 total
 
     .byte $20               ; $FFD5: Map mode (LoROM)
     .byte $00               ; $FFD6: Cartridge type (ROM only)
