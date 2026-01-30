@@ -65,6 +65,7 @@ make rebuild && ninja -C build check-llvm-codegen-w65816
 | `logical.ll` | and, or, xor |
 | `shifts.ll` | constant and variable shifts |
 | `memory.ll` | loads, stores, indirect addressing |
+| `memory-ops.ll` | memory inc/dec/shift optimization |
 | `dp-indirect.ll` | direct page indirect addressing |
 | `control-flow.ll` | calls, returns, branches |
 | `select.ll` | conditional select (signed/unsigned comparisons) |
@@ -138,7 +139,7 @@ make rebuild && ninja -C build check-llvm-codegen-w65816
 **Suboptimal Code Generation:**
 - ADD16rr/SUB16rr uses stack-relative addressing (push, operate, pull overhead)
 - Self-comparison generates unnecessary code
-- Memory shift/rotate/inc/dec instructions are defined but no selection patterns (uses load-op-store)
+- Memory ROL/ROR not yet optimized (INC/DEC/ASL/LSR are optimized)
 
 **Not Implemented:**
 - Vararg support
@@ -150,13 +151,11 @@ make rebuild && ninja -C build check-llvm-codegen-w65816
 
 ## Remaining Work
 
-### Medium Priority
-1. **Memory Operations** - Add patterns for in-place shift/rotate/inc/dec on memory
-
 ### Low Priority
-2. **Vararg Support** - For printf-style functions
-3. **32-bit Returns** - Test and fix A:X pair returns
-4. **`$` Hex Prefix** - Add support for `$FF` syntax (currently requires `0xFF`)
+1. **Vararg Support** - For printf-style functions
+2. **32-bit Returns** - Test and fix A:X pair returns
+3. **`$` Hex Prefix** - Add support for `$FF` syntax (currently requires `0xFF`)
+4. **ROL/ROR Memory** - Memory rotate patterns (INC/DEC/ASL/LSR done)
 
 ---
 
