@@ -73,6 +73,7 @@ make rebuild && ninja -C build check-llvm-codegen-w65816
 | `mul-div-rem.ll` | multiply, divide, remainder (libcalls) |
 | `interrupt.ll` | interrupt handler support (RTI, register save/restore) |
 | `varargs.ll` | variadic function support |
+| `inline-asm-hex.ll` | Motorola-style integers ($hex, %binary) |
 
 ---
 
@@ -124,6 +125,7 @@ make rebuild && ninja -C build check-llvm-codegen-w65816
 **Code Generation:**
 - MC layer with ELF object generation
 - Runtime library for MUL/DIV/REM (`runtime/w65816_runtime.s`)
+- Motorola-style integers in inline assembly: `$FF` (hex), `%11110000` (binary)
 - Assembly parser with all indirect addressing modes:
   - `(dp)`, `(dp),y`, `(dp,x)` - DP indirect
   - `[dp]`, `[dp],y` - DP indirect long
@@ -141,20 +143,19 @@ make rebuild && ninja -C build check-llvm-codegen-w65816
 **Suboptimal Code Generation:**
 - ADD16rr/SUB16rr uses stack-relative addressing (push, operate, pull overhead)
 - Self-comparison generates unnecessary code
-- Memory ROL/ROR not yet optimized (INC/DEC/ASL/LSR are optimized)
+
+**Semantic Mismatches:**
+- Memory ROL/ROR cannot be optimized because W65816's ROL/ROR are "rotate through carry"
+  (17-bit rotation including carry flag), while LLVM's ROTL/ROTR are true N-bit rotations.
+  For rotate-through-carry operations, use inline assembly.
 
 **Not Implemented:**
 - 32-bit integer operations (i32 requires manual 16-bit pair handling)
 - Runtime 8/16-bit mode switching (compile-time flags only)
-- `$` hex prefix in assembly (use `0x` instead)
 
 ---
 
 ## Remaining Work
-
-### Low Priority
-1. **`$` Hex Prefix** - Add support for `$FF` syntax (currently requires `0xFF`)
-2. **ROL/ROR Memory** - Memory rotate patterns (INC/DEC/ASL/LSR done)
 
 ### Not Planned (Significant Effort)
 - **32-bit Integer Support** - Would require full type legalization for i32→i16 pairs, paired register handling for A:X returns, and 32-bit arithmetic via 16-bit pairs. Use library functions or manual 16-bit pairs instead.
