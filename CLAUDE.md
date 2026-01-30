@@ -125,18 +125,21 @@ define i16 @test_main() {
 
 ### Integration Test Files
 
-Location: `test/integration/tests/`
+Location: `test/integration/tests/` (36 tests)
 
-| File | Tests |
-|------|-------|
-| `add.ll`, `sub.ll`, `inc.ll`, `dec.ll` | Arithmetic operations |
-| `and.ll`, `or.ll`, `xor.ll` | Logical operations |
-| `shl.ll`, `lshr.ll`, `ashr.ll` | Shift operations |
-| `icmp-*.ll` | Comparisons (eq, ne, slt, sgt, ult, ugt) |
-| `select.ll` | Conditional select |
-| `sext.ll`, `zext.ll`, `trunc.ll` | Type conversions |
-| `store-load.ll` | Memory operations |
-| `zero.ll`, `large-immediate.ll` | Boundary values |
+| Category | Tests |
+|----------|-------|
+| Arithmetic | `add`, `sub`, `inc`, `dec`, `neg`, `neg-variable`, `mul` |
+| Logical | `and`, `or`, `xor` |
+| Shifts | `shl`, `lshr`, `ashr` |
+| Comparisons | `icmp-eq`, `icmp-ne`, `icmp-slt`, `icmp-sgt`, `icmp-ult`, `icmp-ugt` |
+| Unsigned cmp | `cmp-unsigned`, `cmp-unsigned-simple`, `cmp-args`, `cmp-edge-cases` |
+| Select | `select` |
+| Type conversion | `sext`, `zext`, `trunc` |
+| Memory | `store-load`, `global` |
+| Control flow | `branch`, `loop` |
+| Function calls | `call`, `nested-calls`, `many-args` |
+| Boundary values | `zero`, `large-immediate` |
 
 ### Integration Test Architecture
 
