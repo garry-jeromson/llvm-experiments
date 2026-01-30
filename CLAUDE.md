@@ -185,7 +185,12 @@ make rebuild && ninja -C build check-llvm-codegen-w65816
    - ✅ AND/OR/XOR DP optimization implemented
    - ⚠️ Redundant `tax; txa` after shifts (register allocation artifact, low priority)
    - ⚠️ Signed select has complex branch sequences (inherent to signed compare on 65816)
-4. **Clang integration testing** - Test compiling actual C code through the full toolchain
+4. ~~**Clang integration testing**~~ - ✅ Done: C → LLVM IR → W65816 works!
+   - Use MSP430 target for Clang (`-target msp430-unknown-none -O2`), then change triple
+   - Basic operations work: add, sub, bitwise, shifts, global access
+   - Multiply/divide require runtime library (as expected)
+   - Example: `clang -target msp430-unknown-none -O2 -S -emit-llvm test.c -o test.ll`
+     then edit triple and run `llc -march=w65816 test.ll`
 5. **Runtime library expansion** - Add more library functions (64-bit math, memcpy, etc.)
 6. **Documentation polish** - Add more examples, usage guides
 
