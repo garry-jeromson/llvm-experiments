@@ -1,6 +1,5 @@
 ; INTEGRATION-TEST
 ; EXPECT: 55
-; SKIP: Register allocation fails on phi nodes (known limitation)
 
 target triple = "w65816-unknown-none"
 
