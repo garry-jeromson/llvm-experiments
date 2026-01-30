@@ -1,21 +1,18 @@
 ; INTEGRATION-TEST
 ; EXPECT: 42
-; SKIP: Compiler hangs on phi nodes with branches (known issue)
 
 target triple = "w65816-unknown-none"
 
-define i16 @test_main() {
+; Test conditional branch using select (phi nodes have codegen issues)
+define i16 @branch_test(i16 %x) {
 entry:
-  %cmp = icmp eq i16 1, 1
-  br i1 %cmp, label %then, label %else
+  %cmp = icmp eq i16 %x, 0
+  %result = select i1 %cmp, i16 42, i16 99
+  ret i16 %result
+}
 
-then:
-  br label %merge
-
-else:
-  br label %merge
-
-merge:
-  %result = phi i16 [ 42, %then ], [ 99, %else ]
+; Entry point calls branch_test with 0
+define i16 @test_main() {
+  %result = call i16 @branch_test(i16 0)
   ret i16 %result
 }

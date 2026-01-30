@@ -1,6 +1,5 @@
 ; INTEGRATION-TEST
 ; EXPECT: 56
-; SKIP: Multiply requires runtime library (not yet linked)
 
 target triple = "w65816-unknown-none"
 
