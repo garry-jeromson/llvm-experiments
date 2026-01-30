@@ -43,7 +43,8 @@ NC := \033[0m
         scaffold link-backend rebuild tablegen \
         clean distclean update info list-targets test test-w65816 \
         deps-runtime build-runtime test-runtime clean-runtime \
-        build-test-runner test-integration
+        build-test-runner test-integration \
+        build-snes-demo run-snes-demo
 
 # Default target
 all: help
@@ -93,6 +94,12 @@ help:
 	@echo "  make build-test-runner  - Build 816CE-based CPU emulator runner"
 	@echo "  make test-integration   - Run integration tests (compile IR, execute)"
 	@echo "  make test-integration-verbose - Run with verbose output"
+	@echo ""
+	@echo "$(GREEN)SNES Demo:$(NC)"
+	@echo "  make build-snes-demo    - Build SNES ROM from C code (uses LLVM backend)"
+	@echo "  make build-snes-test    - Build standalone test ROM (pure assembly)"
+	@echo "  make run-snes-demo      - Build and run C demo in SNES emulator"
+	@echo "  make run-snes-test      - Build and run test ROM in SNES emulator"
 	@echo ""
 	@echo "$(GREEN)Configuration Variables:$(NC)"
 	@echo "  BACKEND_NAME=$(BACKEND_NAME)"
@@ -636,3 +643,33 @@ test-integration: build-test-runner
 
 test-integration-verbose: build-test-runner
 	@python3 $(RUNNER_DIR)/run-tests.py -b $(BUILD_DIR) -r $(RUNNER_DIR) -v
+
+# =============================================================================
+# SNES Demo (Real Emulator Testing)
+# =============================================================================
+
+SNES_DIR := $(ROOT_DIR)/snes
+SNES_BUILD_DIR := $(BUILD_DIR)/snes
+SNES_BUILDER := $(ROOT_DIR)/tools/snes-builder
+
+build-snes-demo: deps-runtime
+	@echo "$(BLUE)Building SNES demo ROM...$(NC)"
+	@mkdir -p $(SNES_BUILD_DIR)
+	@python3 $(SNES_BUILDER)/build_rom.py $(SNES_DIR)/demo.c $(SNES_BUILD_DIR)/demo.sfc
+	@echo "$(GREEN)SNES ROM built: $(SNES_BUILD_DIR)/demo.sfc$(NC)"
+
+build-snes-test:
+	@echo "$(BLUE)Building standalone SNES test ROM (pure assembly)...$(NC)"
+	@mkdir -p $(SNES_BUILD_DIR)
+	@ca65 --cpu 65816 -o $(SNES_BUILD_DIR)/test_crt0.o $(SNES_DIR)/test_crt0.s
+	@ld65 -C $(SNES_DIR)/lorom.cfg -o $(SNES_BUILD_DIR)/test.sfc $(SNES_BUILD_DIR)/test_crt0.o
+	@python3 $(SNES_BUILDER)/fix_checksum.py $(SNES_BUILD_DIR)/test.sfc
+	@echo "$(GREEN)Test ROM built: $(SNES_BUILD_DIR)/test.sfc$(NC)"
+
+run-snes-demo: build-snes-demo
+	@echo "$(BLUE)Opening SNES ROM in default emulator...$(NC)"
+	@open $(SNES_BUILD_DIR)/demo.sfc
+
+run-snes-test: build-snes-test
+	@echo "$(BLUE)Opening SNES test ROM in default emulator...$(NC)"
+	@open $(SNES_BUILD_DIR)/test.sfc
