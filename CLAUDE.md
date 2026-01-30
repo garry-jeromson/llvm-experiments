@@ -204,6 +204,12 @@ Location: `test/integration/tests/`
 - Indexed stores with conflicting argument order may generate incorrect code
   - Workaround: Order function arguments so value is first (in A) and index is second (in X)
 
+**Phi Node Issues:**
+- Phi nodes with conditional branches may generate incorrect code (loads result before comparison)
+- Workaround: Use `select` instruction instead of phi nodes for conditional values
+- Constant comparisons (e.g., `icmp eq i16 1, 1`) can cause infinite loops in instruction selection
+- Workaround: Use `opt -O2` before `llc` to fold constants, or use parameter-based comparisons
+
 **Suboptimal Code Generation:**
 - Self-comparison generates unnecessary code
 
