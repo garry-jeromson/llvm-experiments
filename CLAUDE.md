@@ -118,6 +118,7 @@ make rebuild && ninja -C build check-llvm-codegen-w65816
 **Memory & Addressing:**
 - Load/store: LDA, STA, LDX, LDY, STX, STY
 - Absolute, stack-relative, indexed (X and Y), direct page
+- DP indexed modes: `LDX dp,Y` and `LDY dp,X` for cross-index register access
 - Long (24-bit) addressing for `.fardata`, `.rodata`, `.romdata` sections
 - Pointer dereference via stack-relative indirect `(n,s),y`
 - Direct page indirect `($dp)` and `($dp),y` for efficient pointer access in zero page
