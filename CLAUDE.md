@@ -79,6 +79,8 @@ make rebuild && ninja -C build check-llvm-codegen-w65816
 | `dpframe-overflow.ll` | DP frame 256-byte limit error |
 | `edge-cases.ll` | Zero/max values, boundary conditions |
 | `complex-control-flow.ll` | Nested calls, loops, phi nodes |
+| `register-pressure.ll` | Spilling with A, X, Y pressure |
+| `mode-8bit-ops.ll` | 8-bit load/store, truncation, extension |
 
 ---
 
@@ -166,8 +168,8 @@ make rebuild && ninja -C build check-llvm-codegen-w65816
 2. **Test coverage expansion** - In progress:
    - ✅ edge-cases.ll - Zero/max values, boundary conditions
    - ✅ complex-control-flow.ll - Nested calls, loops, phi nodes
-   - [ ] register-pressure.ll - Operations requiring more than A, X, Y; spill/reload
-   - [ ] mode-8bit-ops.ll - Mixed 8/16-bit operations, 8-bit shifts
+   - ✅ register-pressure.ll - Operations requiring more than A, X, Y; spill/reload
+   - ✅ mode-8bit-ops.ll - 8-bit load/store, truncation, extension, mode switching
    - [ ] stack-stress.ll - Deep local allocations, many stack slots
    - [ ] addressing-modes.ll - BRL, JMP indirect variants, all addressing modes
    - [ ] special-instructions.ll - BIT, TSB/TRB, TXY/TYX, PEA/PEI/PER
