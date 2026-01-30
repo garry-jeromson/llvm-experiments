@@ -163,7 +163,16 @@ make rebuild && ninja -C build check-llvm-codegen-w65816
 
 ### Optimization & Polish
 1. ~~**ADD16rr/SUB16rr optimization**~~ - ✅ Done: Uses DP scratch at $FE (saves 4 cycles per operation)
-2. ~~**Test coverage expansion**~~ - ✅ Done: Added edge-cases.ll and complex-control-flow.ll (26 tests total)
+2. **Test coverage expansion** - In progress:
+   - ✅ edge-cases.ll - Zero/max values, boundary conditions
+   - ✅ complex-control-flow.ll - Nested calls, loops, phi nodes
+   - [ ] register-pressure.ll - Operations requiring more than A, X, Y; spill/reload
+   - [ ] mode-8bit-ops.ll - Mixed 8/16-bit operations, 8-bit shifts
+   - [ ] stack-stress.ll - Deep local allocations, many stack slots
+   - [ ] addressing-modes.ll - BRL, JMP indirect variants, all addressing modes
+   - [ ] special-instructions.ll - BIT, TSB/TRB, TXY/TYX, PEA/PEI/PER
+   - [ ] global-data.ll - Initialized arrays, struct access, const data
+   - [ ] switch.ll - Switch statements (jump tables vs branch chains)
 3. **Code generation audit** - Analyze generated code for common patterns and identify optimization opportunities
 4. **Clang integration testing** - Test compiling actual C code through the full toolchain
 5. **Runtime library expansion** - Add more library functions (64-bit math, memcpy, etc.)
