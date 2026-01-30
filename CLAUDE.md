@@ -160,6 +160,14 @@ make rebuild && ninja -C build check-llvm-codegen-w65816
 
 ## Remaining Work
 
+### Optimization & Polish
+1. **ADD16rr/SUB16rr optimization** - Use DP scratch location instead of stack push/pop (minor speedup, requires reserving DP bytes)
+2. **Test coverage expansion** - Add more edge case tests and stress tests
+3. **Code generation audit** - Analyze generated code for common patterns and identify optimization opportunities
+4. **Clang integration testing** - Test compiling actual C code through the full toolchain
+5. **Runtime library expansion** - Add more library functions (64-bit math, memcpy, etc.)
+6. **Documentation polish** - Add more examples, usage guides
+
 ### Not Planned (Significant Effort)
 - **32-bit Integer Support** - Would require full type legalization for i32→i16 pairs, paired register handling for A:X returns, and 32-bit arithmetic via 16-bit pairs. Use library functions or manual 16-bit pairs instead.
 
