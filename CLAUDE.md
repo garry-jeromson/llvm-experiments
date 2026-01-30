@@ -74,6 +74,9 @@ make rebuild && ninja -C build check-llvm-codegen-w65816
 | `interrupt.ll` | interrupt handler support (RTI, register save/restore) |
 | `varargs.ll` | variadic function support |
 | `inline-asm-hex.ll` | Motorola-style integers ($hex, %binary) |
+| `inline-asm-rotate.ll` | ROL/ROR rotate-through-carry |
+| `dpframe.ll` | Direct Page frame allocation |
+| `dpframe-overflow.ll` | DP frame 256-byte limit error |
 
 ---
 
@@ -186,6 +189,27 @@ void irq_handler(void) {
     // Epilogue: rep #48, ply, plx, pla, rti
 }
 ```
+
+### Direct Page Frame Allocation
+
+Use the 256-byte Direct Page region ($00-$FF) for local variables instead of
+stack-relative addressing. Provides faster access (2-byte instructions, 1 cycle faster).
+
+```c
+// Enable DP frame for a function
+__attribute__((annotate("w65816_dpframe")))
+int fast_function() {
+    int a, b;  // Allocated in DP, not on stack
+    // Uses: sta $xx instead of sta n,s
+}
+```
+
+```bash
+# Skip D register save/restore when D is guaranteed to be 0
+llc -march=w65816 -mattr=+assume-d0 file.ll
+```
+
+**Note:** Locals must fit in 256 bytes or compilation fails with an error.
 
 ### Runtime Library
 
