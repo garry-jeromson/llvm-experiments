@@ -144,8 +144,7 @@ make rebuild && ninja -C build check-llvm-codegen-w65816
 - Memory ROL/ROR not yet optimized (INC/DEC/ASL/LSR are optimized)
 
 **Not Implemented:**
-- Vararg support
-- 32-bit return values (A:X pair) untested
+- 32-bit integer operations (i32 requires manual 16-bit pair handling)
 - Runtime 8/16-bit mode switching (compile-time flags only)
 - `$` hex prefix in assembly (use `0x` instead)
 
@@ -154,9 +153,11 @@ make rebuild && ninja -C build check-llvm-codegen-w65816
 ## Remaining Work
 
 ### Low Priority
-1. **32-bit Returns** - Test and fix A:X pair returns
-2. **`$` Hex Prefix** - Add support for `$FF` syntax (currently requires `0xFF`)
-3. **ROL/ROR Memory** - Memory rotate patterns (INC/DEC/ASL/LSR done)
+1. **`$` Hex Prefix** - Add support for `$FF` syntax (currently requires `0xFF`)
+2. **ROL/ROR Memory** - Memory rotate patterns (INC/DEC/ASL/LSR done)
+
+### Not Planned (Significant Effort)
+- **32-bit Integer Support** - Would require full type legalization for i32→i16 pairs, paired register handling for A:X returns, and 32-bit arithmetic via 16-bit pairs. Use library functions or manual 16-bit pairs instead.
 
 ---
 
