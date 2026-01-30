@@ -10,6 +10,9 @@
 ; Import font data from font.s
 .import font_data, font_data_size
 
+; Import sprite data from sprites.s
+.import sprite_data, sprite_data_size
+
 ; Export entry point
 .export reset, nmi_handler, irq_handler
 
@@ -69,14 +72,24 @@ reset:
     dex
     bne @clear_cgram
 
-    ; Clear OAM
+    ; Clear OAM - set all sprites offscreen (Y = $F0)
     stz $2102               ; OAM address low
     stz $2103               ; OAM address high
-    ldx #$0220              ; 544 bytes
+    ldx #$0080              ; 128 sprites
 @clear_oam:
-    stz $2104
+    stz $2104               ; X = 0
+    lda #$F0
+    sta $2104               ; Y = 240 (offscreen)
+    stz $2104               ; Tile = 0
+    stz $2104               ; Attr = 0
     dex
     bne @clear_oam
+    ; Clear high table (32 bytes)
+    ldx #$0020
+@clear_oam_high:
+    stz $2104
+    dex
+    bne @clear_oam_high
 
     ; === GRAPHICS MODE SETUP ===
     ; Set Mode 0 (4 backgrounds, 2bpp each)
@@ -115,9 +128,28 @@ reset:
     lda #$42
     sta $2122
 
-    ; Enable BG1 on main screen
-    lda #$01
-    sta $212C               ; TM = BG1 enabled
+    ; === SPRITE SETUP ===
+    ; OBSEL: sprite size and base address
+    ; Base 0 = VRAM $0000 for sprites (won't conflict with font at $0000-$0FFF)
+    ; Actually, let's use a different base to avoid conflict
+    lda #$03                ; Base 3 = VRAM word $6000, size=0 (8x8/16x16)
+    sta $2101               ; OBSEL
+
+    ; Set sprite palette 0, color 15 to yellow
+    ; Sprite palettes start at CGRAM 128
+    lda #$80 + 15           ; CGRAM address 128 + 15 = 143
+    sta $2121
+    lda #$FF                ; Yellow low byte
+    sta $2122
+    lda #$03                ; Yellow high byte
+    sta $2122
+
+    ; Enable BG1 and sprites on main screen
+    lda #$11                ; Bit 0 = BG1, Bit 4 = OBJ
+    sta $212C               ; TM = BG1 + OBJ enabled
+
+    ; Load sprite graphics to VRAM
+    jsr load_sprites
 
     ; Set up registers for 16-bit mode
     rep #$30                ; 16-bit A/X/Y
@@ -163,6 +195,40 @@ load_font:
     inx
     cpx #font_data_size
     bcc @font_loop
+
+    plp                     ; Restore processor status
+    rts
+
+
+; Load sprite data into VRAM at $6000 (OBSEL base 3)
+; Called with 8-bit A mode
+load_sprites:
+    php                     ; Save processor status
+    rep #$20                ; 16-bit A
+    .a16
+
+    ; Set VRAM address to $6000 (OBSEL base 3)
+    lda #$6000
+    sta $2116               ; VMADDL/VMADDH
+
+    ; Set up for word writes, increment on high byte write
+    sep #$20
+    .a8
+    lda #$80
+    sta $2115               ; VMAIN
+
+    rep #$20
+    .a16
+
+    ; Copy sprite data to VRAM
+    ldx #0
+@sprite_loop:
+    lda sprite_data,x
+    sta $2118               ; VMDATAL/VMDATAH (16-bit write)
+    inx
+    inx
+    cpx #sprite_data_size
+    bcc @sprite_loop
 
     plp                     ; Restore processor status
     rts

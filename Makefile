@@ -687,3 +687,15 @@ run-snes-demo-snes9x: build-snes-demo
 
 run-snes-text-demo-snes9x: build-snes-text-demo
 	@python3 $(SNES_BUILDER)/run_rom.py -e snes9x $(SNES_BUILD_DIR)/text_demo.sfc
+
+build-snes-bounce-demo: deps-runtime
+	@echo "$(BLUE)Building SNES bounce demo ROM...$(NC)"
+	@mkdir -p $(SNES_BUILD_DIR)
+	@python3 $(SNES_BUILDER)/build_rom.py $(SNES_DIR)/bounce_demo.c $(SNES_BUILD_DIR)/bounce_demo.sfc
+	@echo "$(GREEN)SNES bounce demo ROM built: $(SNES_BUILD_DIR)/bounce_demo.sfc$(NC)"
+
+run-snes-bounce-demo: build-snes-bounce-demo
+	@python3 $(SNES_BUILDER)/run_rom.py $(SNES_BUILD_DIR)/bounce_demo.sfc
+
+run-snes-bounce-demo-snes9x: build-snes-bounce-demo
+	@python3 $(SNES_BUILDER)/run_rom.py -e snes9x $(SNES_BUILD_DIR)/bounce_demo.sfc

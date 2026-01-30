@@ -141,10 +141,18 @@ def fix_llvm_asm_for_ca65(asm_path: str) -> str:
         lines.append(line)
 
     # Add necessary ca65 directives at the top
+    # Include imports for runtime library functions
     header = """.p816
 .smart
 .a16
 .i16
+
+; Runtime library imports (for mul, div, mod operations)
+.import __mulhi3
+.import __divhi3
+.import __udivhi3
+.import __modhi3
+.import __umodhi3
 
 """
     fixed_asm = header + '\n'.join(lines)
@@ -247,16 +255,47 @@ def build(source_file: str, output_sfc: str):
     print("\nStep 6b: Assemble font data")
     font_obj = build_dir / "font.o"
     font_path = project_root / "snes" / "font.s"
+    link_objects = [str(crt0_obj)]
     if font_path.exists():
         run([
             "ca65", "--cpu", "65816",
             "-o", str(font_obj),
             str(font_path)
         ], "Running ca65 on font")
-        link_objects = [str(crt0_obj), str(font_obj), str(user_obj)]
+        link_objects.append(str(font_obj))
     else:
         print("  No font.s found, skipping font assembly")
-        link_objects = [str(crt0_obj), str(user_obj)]
+
+    # Step 6c: Assemble sprite data
+    print("\nStep 6c: Assemble sprite data")
+    sprites_obj = build_dir / "sprites.o"
+    sprites_path = project_root / "snes" / "sprites.s"
+    if sprites_path.exists():
+        run([
+            "ca65", "--cpu", "65816",
+            "-o", str(sprites_obj),
+            str(sprites_path)
+        ], "Running ca65 on sprites")
+        link_objects.append(str(sprites_obj))
+    else:
+        print("  No sprites.s found, skipping sprite assembly")
+
+    # Step 6d: Assemble runtime library (for mul, div, etc.)
+    print("\nStep 6d: Assemble runtime library")
+    runtime_obj = build_dir / "w65816_runtime.o"
+    runtime_path = project_root / "src" / "llvm-project" / "llvm" / "lib" / "Target" / "W65816" / "runtime" / "w65816_runtime.s"
+    if runtime_path.exists():
+        run([
+            "ca65", "--cpu", "65816",
+            "-o", str(runtime_obj),
+            str(runtime_path)
+        ], "Running ca65 on runtime library")
+        link_objects.append(str(runtime_obj))
+    else:
+        print("  No runtime library found, skipping")
+
+    # Add user code last
+    link_objects.append(str(user_obj))
 
     # Step 7: Link
     print("\nStep 7: Link ROM")
