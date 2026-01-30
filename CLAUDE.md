@@ -77,6 +77,8 @@ make rebuild && ninja -C build check-llvm-codegen-w65816
 | `inline-asm-rotate.ll` | ROL/ROR rotate-through-carry |
 | `dpframe.ll` | Direct Page frame allocation |
 | `dpframe-overflow.ll` | DP frame 256-byte limit error |
+| `edge-cases.ll` | Zero/max values, boundary conditions |
+| `complex-control-flow.ll` | Nested calls, loops, phi nodes |
 
 ---
 
@@ -161,7 +163,7 @@ make rebuild && ninja -C build check-llvm-codegen-w65816
 
 ### Optimization & Polish
 1. ~~**ADD16rr/SUB16rr optimization**~~ - ✅ Done: Uses DP scratch at $FE (saves 4 cycles per operation)
-2. **Test coverage expansion** - Add more edge case tests and stress tests
+2. ~~**Test coverage expansion**~~ - ✅ Done: Added edge-cases.ll and complex-control-flow.ll (26 tests total)
 3. **Code generation audit** - Analyze generated code for common patterns and identify optimization opportunities
 4. **Clang integration testing** - Test compiling actual C code through the full toolchain
 5. **Runtime library expansion** - Add more library functions (64-bit math, memcpy, etc.)
