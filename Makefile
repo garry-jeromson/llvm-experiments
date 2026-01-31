@@ -41,7 +41,8 @@ NC := \033[0m
 
 .PHONY: all help deps clone setup configure build build-fast install \
         scaffold link-backend rebuild tablegen \
-        clean distclean update info list-targets test test-w65816 \
+        clean distclean update update-submodules push-submodules \
+        info list-targets test test-w65816 test-llvm \
         deps-runtime build-runtime test-runtime clean-runtime \
         build-test-runner test-integration \
         build-snes-demo run-snes-demo
@@ -86,9 +87,11 @@ help:
 	@echo "$(GREEN)Maintenance:$(NC)"
 	@echo "  make clean         - Clean build directory"
 	@echo "  make distclean     - Remove all generated files"
-	@echo "  make update        - Update LLVM source"
-	@echo "  make info          - Show environment information"
-	@echo "  make list-targets  - List available LLVM targets"
+	@echo "  make update            - Update LLVM source (git pull)"
+	@echo "  make update-submodules - Update submodules to latest commits"
+	@echo "  make push-submodules   - Push submodule changes to remote"
+	@echo "  make info              - Show environment information"
+	@echo "  make list-targets      - List available LLVM targets"
 	@echo ""
 	@echo "$(GREEN)W65816 Runtime Library:$(NC)"
 	@echo "  make deps-runtime  - Install cc65 toolchain"
@@ -463,6 +466,17 @@ update:
 		echo "$(RED)Error: LLVM source not found$(NC)"; \
 		exit 1; \
 	fi
+
+update-submodules:
+	@echo "$(BLUE)Updating submodules to latest commits...$(NC)"
+	@git submodule update --remote --merge
+	@echo "$(GREEN)Submodules updated$(NC)"
+	@echo "Run 'git add src/llvm-project && git commit' to record the update"
+
+push-submodules:
+	@echo "$(BLUE)Pushing submodule changes...$(NC)"
+	@cd $(SRC_DIR) && git push
+	@echo "$(GREEN)Submodule changes pushed$(NC)"
 
 info:
 	@echo "$(BLUE)Environment Information$(NC)"
