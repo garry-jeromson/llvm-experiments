@@ -1,5 +1,12 @@
 # LLVM build artifacts
 build/
+
+# IDE/editor caches
+.cache/
+
+# SNES build artifacts
+snes/*.o
+snes/*.s
 install/
 
 # IDE and editor files
