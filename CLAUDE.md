@@ -246,6 +246,12 @@ This allows tests with function calls and global variables to work correctly.
 - Indexed stores with conflicting argument order may generate incorrect code
   - Workaround: Order function arguments so value is first (in A) and index is second (in X)
 
+**Call Argument Shuffling:**
+- When a wrapper function reorders arguments before calling another function,
+  the COPY instructions that shuffle registers may be eliminated as "dead"
+  - Example: `foo(a,b,c) { return bar(c,b,a); }` may pass wrong argument order
+  - Workaround: Avoid wrapper functions that only reorder arguments
+
 **Phi Node Issues:**
 - Complex phi nodes with high register pressure may generate suboptimal code
 - Workaround: Use `select` instruction instead of phi nodes for conditional values when possible
