@@ -4,7 +4,7 @@
 
 # Configuration
 # -------------
-BACKEND_NAME ?= MyTarget
+BACKEND_NAME ?= W65816
 LLVM_VERSION ?= main
 LLVM_REPO ?= https://github.com/llvm/llvm-project.git
 
@@ -159,13 +159,19 @@ setup: deps clone
 configure:
 	@echo "$(BLUE)Configuring LLVM...$(NC)"
 	@mkdir -p $(BUILD_DIR)
-	@cd $(BUILD_DIR) && cmake -G $(CMAKE_GENERATOR) \
+	@EXPERIMENTAL_TARGET=""; \
+	if [ -d "$(SRC_DIR)/llvm/lib/Target/$(BACKEND_NAME)" ]; then \
+		EXPERIMENTAL_TARGET="$(BACKEND_NAME)"; \
+		echo "$(GREEN)Detected linked backend: $(BACKEND_NAME)$(NC)"; \
+	fi; \
+	cd $(BUILD_DIR) && cmake -G $(CMAKE_GENERATOR) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DCMAKE_INSTALL_PREFIX=$(INSTALL_DIR) \
 		-DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
 		\
 		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DLLVM_TARGETS_TO_BUILD="$(REFERENCE_TARGETS)" \
+		-DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="$$EXPERIMENTAL_TARGET" \
 		-DLLVM_ENABLE_PROJECTS="$(LLVM_PROJECTS)" \
 		\
 		-DLLVM_CCACHE_BUILD=$(if $(CCACHE),ON,OFF) \
@@ -527,32 +533,15 @@ test-backend:
 	@cmake --build $(BUILD_DIR) --target check-llvm-codegen-$(shell echo $(BACKEND_NAME) | tr A-Z a-z) 2>/dev/null || \
 		echo "$(YELLOW)No specific tests found for $(BACKEND_NAME). Run 'make test' for all tests.$(NC)"
 
-# W65816-specific test target
+# W65816-specific test target (uses LLVM's lit test runner)
 TEST_DIR := $(SRC_DIR)/llvm/test/CodeGen/W65816
 test-w65816:
 	@echo "$(BLUE)Running W65816 backend tests...$(NC)"
-	@if [ ! -x "$(BUILD_DIR)/bin/llc" ]; then \
-		echo "$(RED)Error: llc not built. Run 'make build-fast' first.$(NC)"; \
+	@if [ ! -x "$(BUILD_DIR)/bin/llvm-lit" ]; then \
+		echo "$(RED)Error: llvm-lit not built. Run 'make build-fast' first.$(NC)"; \
 		exit 1; \
 	fi
-	@if [ ! -x "$(BUILD_DIR)/bin/FileCheck" ]; then \
-		echo "$(RED)Error: FileCheck not built. Run 'make build-fast' first.$(NC)"; \
-		exit 1; \
-	fi
-	@PASS=0; FAIL=0; \
-	for f in $(TEST_DIR)/*.ll; do \
-		printf "Testing $$(basename $$f)... "; \
-		if $(BUILD_DIR)/bin/llc -march=w65816 "$$f" -o - 2>&1 | $(BUILD_DIR)/bin/FileCheck "$$f" 2>/dev/null; then \
-			echo "$(GREEN)PASS$(NC)"; \
-			PASS=$$((PASS + 1)); \
-		else \
-			echo "$(RED)FAIL$(NC)"; \
-			FAIL=$$((FAIL + 1)); \
-		fi; \
-	done; \
-	echo ""; \
-	echo "$(BLUE)Results: $$PASS passed, $$FAIL failed$(NC)"; \
-	if [ $$FAIL -gt 0 ]; then exit 1; fi
+	@$(BUILD_DIR)/bin/llvm-lit -v $(TEST_DIR)
 
 # =============================================================================
 # W65816 Runtime Library

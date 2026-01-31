@@ -1,18 +1,22 @@
 # W65816 Backend Polish Options
 
-## Low-Hanging Fruit
+## Completed
 
-1. **Fix CMP16rr edge case** - Same bug pattern as SUB16rr (when src1 is X/Y and src2 is A). Not hit in practice due to calling convention, but could cause issues with unusual register allocation.
+1. ~~**Fix CMP16rr edge case**~~ - Verified safe. Unlike SUB16rr, CMP16rr doesn't write back a result (only sets flags), so the defensive code structure is correct.
 
-2. **More peephole optimizations**:
-   - `LDA #0` could become `LDA #0` or `TXA` after `LDX #0` (minor)
-   - Consecutive `CLC; CLC` or `SEC; SEC` (unlikely but possible)
-   - `PHA; PLA` pairs that don't cross branches
+2. ~~**Peephole optimizations**~~ - All implemented:
+   - Consecutive `CLC; CLC` or `SEC; SEC` (duplicate elimination)
+   - `SEC; CLC` or `CLC; SEC` (cancellation - first is pointless)
+   - `PHA; PLA`, `PHX; PLX`, `PHY; PLY` pairs
+   - Redundant transfer pairs (`TAX; TXA`, etc.)
+   - `BRA` to fall-through block
 
-3. **Additional integration tests**:
-   - Function with many arguments (tests stack passing)
-   - Nested function calls
-   - Comparison edge cases (INT16_MIN, INT16_MAX)
+3. ~~**Additional integration tests**~~ - All implemented:
+   - `many-args.ll` - 6 arguments via stack passing
+   - `nested-calls.ll` - Multiple levels of function calls
+   - `cmp-edge-cases.ll` - INT16_MIN (-32768) comparison
+   - `int16-max-cmp.ll` - INT16_MAX (32767) comparison
+   - `double-neg.ll` - Double negation correctness
 
 ## Medium Effort
 
