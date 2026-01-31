@@ -1,5 +1,4 @@
-# LLVM source and build artifacts
-src/
+# LLVM build artifacts
 build/
 install/
 

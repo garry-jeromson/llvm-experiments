@@ -1,0 +1,6 @@
+[submodule "src/llvm-project"]
+	path = src/llvm-project
+	url = https://github.com/garry-jeromson/llvm-project.git
+[submodule "tools/816ce"]
+	path = tools/816ce
+	url = https://github.com/garry-jeromson/816CE.git
