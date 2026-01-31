@@ -6,12 +6,17 @@ This project is developing an LLVM backend for the **W65816** 16-bit microproces
 
 ```
 llvm-experiments/
-├── Makefile                    # Build workflow (make deps, clone, configure, build-fast)
-├── build/                      # Build output (llc, clang, opt binaries)
-├── src/llvm-project/           # LLVM monorepo
-│   └── llvm/lib/Target/W65816/ # Our backend implementation
-│   └── llvm/test/CodeGen/W65816/ # Backend tests (FileCheck-based)
-└── CLAUDE.md                   # This file
+├── Makefile                       # Build workflow (make deps, clone, configure, build-fast)
+├── build/                         # Build output (llc, clang, opt binaries)
+├── src/llvm-project/              # LLVM monorepo (submodule)
+│   └── llvm/lib/Target/W65816/    # Backend implementation
+│   └── llvm/test/CodeGen/W65816/  # FileCheck tests
+├── tools/816ce/                   # 65816 CPU emulator (submodule)
+├── test/integration/              # Execution-based integration tests
+├── docs/                          # Additional documentation
+├── snes/                          # SNES demo programs
+├── README.md                      # Quick-start guide
+└── CLAUDE.md                      # This file (comprehensive reference)
 ```
 
 ## Key Backend Files
@@ -48,14 +53,11 @@ make rebuild       # Incremental rebuild after changes
 **IMPORTANT: All changes must pass tests before committing.**
 
 ```bash
-# Run W65816 tests only (REQUIRED after every change)
-ninja -C build check-llvm-codegen-w65816
-
-# Alternative using make
+# Run W65816 FileCheck tests (uses llvm-lit)
 make test-w65816
 
 # Workflow after making changes:
-make rebuild && ninja -C build check-llvm-codegen-w65816
+make rebuild && make test-w65816
 ```
 
 ### Integration Tests (Execution Verification)
@@ -64,14 +66,8 @@ Integration tests compile LLVM IR to machine code and execute it in a CPU emulat
 to verify the generated code produces correct results.
 
 ```bash
-# Build the test runner (uses 816CE CPU emulator)
-make build-test-runner
-
 # Run integration tests
 make test-integration
-
-# Verbose output
-make test-integration-verbose
 ```
 
 Test files are in `test/integration/tests/*.ll` with format:
@@ -125,20 +121,20 @@ define i16 @test_main() {
 
 ### Integration Test Files
 
-Location: `test/integration/tests/` (36 tests)
+Location: `test/integration/tests/`
 
 | Category | Tests |
 |----------|-------|
-| Arithmetic | `add`, `sub`, `inc`, `dec`, `neg`, `neg-variable`, `mul` |
+| Arithmetic | `add`, `sub`, `inc`, `dec`, `neg`, `neg-variable`, `mul`, `double-neg` |
 | Logical | `and`, `or`, `xor` |
 | Shifts | `shl`, `lshr`, `ashr` |
 | Comparisons | `icmp-eq`, `icmp-ne`, `icmp-slt`, `icmp-sgt`, `icmp-ult`, `icmp-ugt` |
-| Unsigned cmp | `cmp-unsigned`, `cmp-unsigned-simple`, `cmp-args`, `cmp-edge-cases` |
+| Unsigned cmp | `cmp-unsigned`, `cmp-unsigned-simple`, `cmp-args`, `cmp-edge-cases`, `int16-max-cmp` |
 | Select | `select` |
 | Type conversion | `sext`, `zext`, `trunc` |
 | Memory | `store-load`, `global` |
 | Control flow | `branch`, `loop` |
-| Function calls | `call`, `nested-calls`, `many-args` |
+| Function calls | `call`, `nested-calls`, `many-args`, `call-shuffle-args` |
 | Boundary values | `zero`, `large-immediate` |
 
 ### Integration Test Architecture
@@ -228,7 +224,7 @@ This allows tests with function calls and global variables to work correctly.
 - Varargs support (va_start, va_arg, va_end, va_copy)
 
 **Code Generation:**
-- Native Clang target: `clang -target w65816-unknown-none` (no MSP430 proxy needed)
+- Native Clang target: `clang -target w65816-unknown-none`
 - MC layer with ELF object generation
 - Runtime library for MUL/DIV/REM (`runtime/w65816_runtime.s`)
 - Motorola-style integers in inline assembly: `$FF` (hex), `%11110000` (binary)
@@ -324,11 +320,9 @@ Stack Relative Indirect Y, Absolute Indirect, Absolute Indexed Indirect, Long, L
    - ✅ Redundant `tax; txa` / `tay; tya` eliminated by peephole pass
    - ⚠️ Signed select has complex branch sequences (inherent to signed compare on 65816)
 4. ~~**Clang integration testing**~~ - ✅ Done: C → LLVM IR → W65816 works!
-   - Use MSP430 target for Clang (`-target msp430-unknown-none -O2`), then change triple
+   - Native Clang target: `clang -target w65816-unknown-none -O2`
    - Basic operations work: add, sub, bitwise, shifts, global access
    - Multiply/divide require runtime library (as expected)
-   - Example: `clang -target msp430-unknown-none -O2 -S -emit-llvm test.c -o test.ll`
-     then edit triple and run `llc -march=w65816 test.ll`
 5. **Runtime library expansion** - Optional future work
    - Current: __mulhi3, __divhi3, __udivhi3, __modhi3, __umodhi3
    - Potential additions: memcpy, memset, 32-bit math (if needed)

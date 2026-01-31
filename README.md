@@ -13,13 +13,13 @@ This project adds W65816 target support to LLVM, enabling:
 
 ```
 llvm-experiments/
-├── src/llvm-project/           # LLVM monorepo (submodule)
-│   └── llvm/lib/Target/W65816/ # Backend implementation
-│   └── llvm/test/CodeGen/W65816/
-├── tools/816ce/                # 65816 CPU emulator (submodule)
-├── test/integration/           # Execution-based integration tests
-├── runtime/                    # Runtime library (mul, div, mod)
-└── snes/                       # SNES demo programs
+├── src/llvm-project/              # LLVM monorepo (submodule)
+│   └── llvm/lib/Target/W65816/    # Backend implementation
+│   └── llvm/test/CodeGen/W65816/  # FileCheck tests
+├── tools/816ce/                   # 65816 CPU emulator (submodule)
+├── test/integration/              # Execution-based integration tests
+├── docs/                          # Additional documentation
+└── snes/                          # SNES demo programs
 ```
 
 ## Getting Started
@@ -53,8 +53,7 @@ This builds `llc`, `clang`, and `opt` in the `build/bin/` directory.
 # Run W65816 FileCheck tests
 make test-w65816
 
-# Run integration tests (requires emulator)
-make build-test-runner
+# Run integration tests (compiles and executes in CPU emulator)
 make test-integration
 ```
 
