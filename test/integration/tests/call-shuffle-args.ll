@@ -1,6 +1,5 @@
 ; INTEGRATION-TEST
 ; EXPECT: 6
-; SKIP: Argument register shuffling bug - COPY instructions are eliminated
 
 target triple = "w65816-unknown-none"
 

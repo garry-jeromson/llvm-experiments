@@ -273,9 +273,11 @@ def apply_relocations(code_bytes, data_bytes, elf_data, code_addr, data_addr):
 
     # Build section address map
     section_addrs = {}
+    text_section_idx = None
     for sec in sections:
         if sec.get('name') == '.text':
             section_addrs[sec['index']] = code_addr
+            text_section_idx = sec['index']
         elif sec.get('name') == '.data':
             section_addrs[sec['index']] = data_addr
 
@@ -335,6 +337,42 @@ def apply_relocations(code_bytes, data_bytes, elf_data, code_addr, data_addr):
             if offset + 2 <= len(code):
                 code[offset] = rel & 0xFF
                 code[offset + 1] = (rel >> 8) & 0xFF
+
+    # Fix up same-section references (JSR/JSL to functions in .text)
+    # These don't generate relocations but still need address adjustment.
+    # Any JSR/JSL with a target address that's within the .text section size
+    # needs to be adjusted by adding code_addr.
+    code_size = len(code)
+
+    # Scan for JSR (0x20) and JSL (0x22) instructions
+    i = 0
+    while i < len(code):
+        opcode = code[i]
+        if opcode == 0x20:  # JSR abs (3 bytes)
+            if i + 2 < len(code):
+                # Read 16-bit target address (little-endian)
+                target = code[i + 1] | (code[i + 2] << 8)
+                # If target is within the code section, it's a same-section reference
+                # that needs to be adjusted to the final load address
+                if target < code_size:
+                    new_target = code_addr + target
+                    code[i + 1] = new_target & 0xFF
+                    code[i + 2] = (new_target >> 8) & 0xFF
+            i += 3
+        elif opcode == 0x22:  # JSL long (4 bytes)
+            if i + 3 < len(code):
+                # Read 24-bit target address (little-endian)
+                target = code[i + 1] | (code[i + 2] << 8) | (code[i + 3] << 16)
+                # For JSL in bank 0, fix up same-section references
+                if target < code_size:
+                    new_target = code_addr + target
+                    code[i + 1] = new_target & 0xFF
+                    code[i + 2] = (new_target >> 8) & 0xFF
+                    code[i + 3] = (new_target >> 16) & 0xFF
+            i += 4
+        else:
+            # Skip to next instruction
+            i += 1
 
     return bytes(code), bytes(data)
 
