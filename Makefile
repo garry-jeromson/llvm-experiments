@@ -681,13 +681,6 @@ run-snes-text-demo: build-snes-text-demo
 run-snes-test: build-snes-test
 	@python3 $(SNES_BUILDER)/run_rom.py $(SNES_BUILD_DIR)/test.sfc
 
-# Run with specific emulator: make run-snes-text-demo-snes9x
-run-snes-demo-snes9x: build-snes-demo
-	@python3 $(SNES_BUILDER)/run_rom.py -e snes9x $(SNES_BUILD_DIR)/demo.sfc
-
-run-snes-text-demo-snes9x: build-snes-text-demo
-	@python3 $(SNES_BUILDER)/run_rom.py -e snes9x $(SNES_BUILD_DIR)/text_demo.sfc
-
 build-snes-bounce-demo: deps-runtime
 	@echo "$(BLUE)Building SNES bounce demo ROM...$(NC)"
 	@mkdir -p $(SNES_BUILD_DIR)
@@ -696,6 +689,3 @@ build-snes-bounce-demo: deps-runtime
 
 run-snes-bounce-demo: build-snes-bounce-demo
 	@python3 $(SNES_BUILDER)/run_rom.py $(SNES_BUILD_DIR)/bounce_demo.sfc
-
-run-snes-bounce-demo-snes9x: build-snes-bounce-demo
-	@python3 $(SNES_BUILDER)/run_rom.py -e snes9x $(SNES_BUILD_DIR)/bounce_demo.sfc
