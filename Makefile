@@ -76,23 +76,27 @@ help:
 	@echo "  make rebuild       - Incremental rebuild after changes"
 	@echo "  make tablegen      - Run TableGen for backend"
 	@echo ""
+	@echo "$(GREEN)Testing:$(NC)"
+	@echo "  make test               - Run ALL W65816 tests (backend + integration + runtime)"
+	@echo "  make test-w65816        - Run W65816 backend FileCheck tests"
+	@echo "  make test-integration   - Run integration tests (compile IR, execute)"
+	@echo "  make test-runtime       - Run runtime library tests (49 tests)"
+	@echo "  make test-llvm          - Run full LLVM test suite"
+	@echo ""
 	@echo "$(GREEN)Maintenance:$(NC)"
 	@echo "  make clean         - Clean build directory"
 	@echo "  make distclean     - Remove all generated files"
 	@echo "  make update        - Update LLVM source"
 	@echo "  make info          - Show environment information"
 	@echo "  make list-targets  - List available LLVM targets"
-	@echo "  make test          - Run LLVM tests"
 	@echo ""
 	@echo "$(GREEN)W65816 Runtime Library:$(NC)"
 	@echo "  make deps-runtime  - Install cc65 toolchain"
 	@echo "  make build-runtime - Build runtime library (w65816_runtime.o)"
-	@echo "  make test-runtime  - Build runtime test binary"
 	@echo "  make clean-runtime - Clean runtime build files"
 	@echo ""
 	@echo "$(GREEN)W65816 Integration Testing:$(NC)"
 	@echo "  make build-test-runner  - Build 816CE-based CPU emulator runner"
-	@echo "  make test-integration   - Run integration tests (compile IR, execute)"
 	@echo "  make test-integration-verbose - Run with verbose output"
 	@echo ""
 	@echo "$(GREEN)SNES Demo:$(NC)"
@@ -515,7 +519,7 @@ list-targets:
 		echo "$(RED)Error: llc not built. Run 'make build-fast' first.$(NC)"; \
 	fi
 
-test:
+test-llvm:
 	@echo "$(BLUE)Running LLVM tests...$(NC)"
 	@if [ ! -d "$(BUILD_DIR)" ]; then \
 		echo "$(RED)Error: Build directory not found. Run 'make configure' first.$(NC)"; \
@@ -523,6 +527,13 @@ test:
 	fi
 	@cmake --build $(BUILD_DIR) --target check-llvm
 	@echo "$(GREEN)Tests complete!$(NC)"
+
+# Master test target - runs all W65816 tests in order
+test: test-w65816 test-integration test-runtime
+	@echo ""
+	@echo "$(GREEN)=============================================$(NC)"
+	@echo "$(GREEN)All W65816 tests passed!$(NC)"
+	@echo "$(GREEN)=============================================$(NC)"
 
 test-backend:
 	@echo "$(BLUE)Running tests for $(BACKEND_NAME) backend...$(NC)"
@@ -580,18 +591,16 @@ build-runtime-test: deps-runtime
 	@echo "  1. Load test_runtime.bin at address 0x8000 in a 65816 emulator"
 	@echo "  2. Execute from 0x8000"
 	@echo "  3. Check memory after halt:"
-	@echo "     0x0000 = Total tests (expect 40)"
+	@echo "     0x0000 = Total tests (expect 49)"
 	@echo "     0x0002 = Passed"
 	@echo "     0x0004 = Failed"
 	@echo "     0x0006 = 0x600D (pass) or 0xFA11 (fail)"
 
-test-runtime: build-runtime-test
-	@echo "$(BLUE)Runtime test binary ready at: $(RUNTIME_BUILD_DIR)/test_runtime.bin$(NC)"
-	@echo ""
-	@echo "$(YELLOW)Manual step required:$(NC) Run in a 65816 emulator"
-	@echo "  - Load address: 0x8000"
-	@echo "  - Entry point:  0x8000"
-	@echo "  - Check 0x0006 for result (0x600D = pass, 0xFA11 = fail)"
+test-runtime: build-runtime-test build-test-runner
+	@echo "$(BLUE)Running runtime library tests...$(NC)"
+	@$(BUILD_DIR)/bin/w65816-runner -e 0x600D -o 0x8000 --result-addr 0x0006 $(RUNTIME_BUILD_DIR)/test_runtime.bin && \
+		echo "$(GREEN)Runtime tests passed!$(NC)" || \
+		(echo "$(RED)Runtime tests failed!$(NC)"; exit 1)
 
 clean-runtime:
 	@echo "$(BLUE)Cleaning runtime build files...$(NC)"

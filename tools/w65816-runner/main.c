@@ -20,6 +20,7 @@ static void print_usage(const char *prog) {
     fprintf(stderr, "Usage: %s [options] <binary>\n", prog);
     fprintf(stderr, "Options:\n");
     fprintf(stderr, "  -e, --expect <value>   Expected result value\n");
+    fprintf(stderr, "  -r, --result-addr <a>  Address to read result from (default: 0x%04X)\n", RESULT_ADDR);
     fprintf(stderr, "  -v, --verbose          Verbose output\n");
     fprintf(stderr, "  -d, --debug            Debug output (show CPU state)\n");
     fprintf(stderr, "  -c, --cycles <limit>   Cycle limit (default: %d)\n", MAX_CYCLES);
@@ -48,22 +49,27 @@ int main(int argc, char **argv) {
     int debug = 0;
     uint64_t cycle_limit = MAX_CYCLES;
     uint16_t load_addr = ROM_START;
+    uint16_t result_addr = RESULT_ADDR;
 
     static struct option long_options[] = {
-        {"expect",  required_argument, 0, 'e'},
-        {"verbose", no_argument,       0, 'v'},
-        {"debug",   no_argument,       0, 'd'},
-        {"cycles",  required_argument, 0, 'c'},
-        {"org",     required_argument, 0, 'o'},
-        {"help",    no_argument,       0, 'h'},
+        {"expect",      required_argument, 0, 'e'},
+        {"result-addr", required_argument, 0, 'r'},
+        {"verbose",     no_argument,       0, 'v'},
+        {"debug",       no_argument,       0, 'd'},
+        {"cycles",      required_argument, 0, 'c'},
+        {"org",         required_argument, 0, 'o'},
+        {"help",        no_argument,       0, 'h'},
         {0, 0, 0, 0}
     };
 
     int opt;
-    while ((opt = getopt_long(argc, argv, "e:vdc:o:h", long_options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "e:r:vdc:o:h", long_options, NULL)) != -1) {
         switch (opt) {
             case 'e':
                 expected = (int)strtol(optarg, NULL, 0);
+                break;
+            case 'r':
+                result_addr = (uint16_t)strtol(optarg, NULL, 0);
                 break;
             case 'v':
                 verbose = 1;
@@ -204,7 +210,7 @@ int main(int argc, char **argv) {
     }
 
     // Read result from memory (16-bit little-endian)
-    uint16_t result = mem[RESULT_ADDR].val | (mem[RESULT_ADDR + 1].val << 8);
+    uint16_t result = mem[result_addr].val | (mem[result_addr + 1].val << 8);
 
     // Report results
     uint64_t elapsed = cpu.cycles - start_cycles;

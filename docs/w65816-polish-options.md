@@ -18,22 +18,28 @@
    - `int16-max-cmp.ll` - INT16_MAX (32767) comparison
    - `double-neg.ll` - Double negation correctness
 
+4. ~~**Instruction selection improvements**~~ - Already implemented:
+   - `STZ` (store zero) used for storing zero to absolute addresses
+   - `INC abs` / `DEC abs` used for memory increment/decrement
+
+5. ~~**Runtime library expansion**~~ - Implemented:
+   - Arithmetic: `__mulhi3`, `__divhi3`, `__udivhi3`, `__modhi3`, `__umodhi3`
+   - Memory: `memcpy`, `memset`, `memmove` - useful for struct copies
+   - Full test suite (49 tests) verifies all functions
+   - Note: 32-bit shift helpers could be added in the future
+
 ## Medium Effort
 
-4. **Runtime library expansion**:
-   - `memcpy`, `memset`, `memmove` - useful for struct copies
-   - 32-bit shift helpers - for cases where 32-bit ops are needed
+6. **32-bit shift helpers**:
+   - For cases where 32-bit operations are needed
+   - Could be added to runtime library
 
-5. **Instruction selection improvements**:
-   - Use `STZ` (store zero) instead of `LDA #0; STA` where applicable
-   - Use `INC abs` / `DEC abs` for memory increment when beneficial
-
-6. **Better diagnostics**:
+7. **Better diagnostics**:
    - Clearer error messages when register pressure exceeds limits
    - Warnings for patterns known to generate suboptimal code
 
 ## Larger Efforts (Not Recommended)
 
-7. **32-bit integer support** - Requires type legalization, paired registers. Use library functions instead.
+8. **32-bit integer support** - Requires type legalization, paired registers. Use library functions instead.
 
-8. **Complex phi node handling** - Deep register allocator changes needed.
+9. **Complex phi node handling** - Deep register allocator changes needed.
