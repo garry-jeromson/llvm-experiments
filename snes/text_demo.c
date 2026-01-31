@@ -24,17 +24,7 @@ static unsigned char peek(unsigned int addr) {
     return *(volatile unsigned char *)addr;
 }
 
-/* Wait for VBlank to start (safe time to write VRAM) */
-static void wait_vblank(void) {
-    /* Wait until we're NOT in VBlank (in case we're already in one) */
-    while (peek(0x4212) & 0x80) {
-        __asm__ volatile("nop");
-    }
-    /* Now wait until VBlank starts */
-    while (!(peek(0x4212) & 0x80)) {
-        __asm__ volatile("nop");
-    }
-}
+/* wait_vblank() is now provided by snes.h */
 
 /* ============================================================================
  * Simplified Text Output
