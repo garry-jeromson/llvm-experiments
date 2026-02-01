@@ -332,14 +332,19 @@ def extract_data_section(elf_data):
     return b''
 
 def extract_rodata_section(elf_data):
-    """Extract .rodata section from ELF object file."""
+    """Extract .rodata section(s) from ELF object file.
+
+    Handles both '.rodata' and variants like '.rodata.cst8'.
+    """
     sections = parse_elf(elf_data)
+    rodata_bytes = b''
 
     for sec in sections:
-        if sec.get('name') == '.rodata':
-            return elf_data[sec['offset']:sec['offset'] + sec['size']]
+        name = sec.get('name', '')
+        if name == '.rodata' or name.startswith('.rodata.'):
+            rodata_bytes += elf_data[sec['offset']:sec['offset'] + sec['size']]
 
-    return b''
+    return rodata_bytes
 
 def apply_relocations(code_bytes, data_bytes, rodata_bytes, elf_data, code_addr, data_addr, rodata_addr, runtime_symbols=None):
     """Apply relocations to code, data, and rodata sections."""
@@ -355,14 +360,19 @@ def apply_relocations(code_bytes, data_bytes, rodata_bytes, elf_data, code_addr,
     relocations = get_relocations(elf_data, sections)
 
     # Build section address map
+    # Track rodata subsection offsets for proper address calculation
     section_addrs = {}
+    rodata_offset = 0
     for sec in sections:
-        if sec.get('name') == '.text':
+        name = sec.get('name', '')
+        if name == '.text':
             section_addrs[sec['index']] = code_addr
-        elif sec.get('name') == '.data':
+        elif name == '.data':
             section_addrs[sec['index']] = data_addr
-        elif sec.get('name') == '.rodata':
-            section_addrs[sec['index']] = rodata_addr
+        elif name == '.rodata' or name.startswith('.rodata.'):
+            # Handle .rodata and its variants (.rodata.cst8, etc.)
+            section_addrs[sec['index']] = rodata_addr + rodata_offset
+            rodata_offset += sec['size']
 
     # W65816 relocation types
     R_W65816_16 = 1
