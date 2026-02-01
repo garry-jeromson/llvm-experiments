@@ -44,7 +44,7 @@ NC := \033[0m
         clean distclean update update-submodules push-submodules \
         info list-targets test test-w65816 test-llvm \
         deps-runtime build-runtime test-runtime clean-runtime \
-        build-test-runner test-integration \
+        build-test-runner test-integration test-c-integration \
         build-snes-demo run-snes-demo
 
 # Default target
@@ -101,6 +101,8 @@ help:
 	@echo "$(GREEN)W65816 Integration Testing:$(NC)"
 	@echo "  make build-test-runner  - Build 816CE-based CPU emulator runner"
 	@echo "  make test-integration-verbose - Run with verbose output"
+	@echo "  make test-c-integration - Run C integration tests (compile C, execute)"
+	@echo "  make test-c-integration-verbose - C tests with verbose output"
 	@echo ""
 	@echo "$(GREEN)SNES Demo:$(NC)"
 	@echo "  make build-snes-demo    - Build SNES ROM from C code (uses LLVM backend)"
@@ -701,3 +703,14 @@ build-snes-bounce-demo: deps-runtime
 
 run-snes-bounce-demo: build-snes-bounce-demo
 	@python3 $(SNES_BUILDER)/run_rom.py $(SNES_BUILD_DIR)/bounce_demo.sfc
+
+# =============================================================================
+# W65816 C Integration Testing
+# =============================================================================
+
+test-c-integration: build-test-runner
+	@echo "$(BLUE)Running W65816 C integration tests...$(NC)"
+	@python3 test/c-integration/run_tests.py -b $(BUILD_DIR)
+
+test-c-integration-verbose: build-test-runner
+	@python3 test/c-integration/run_tests.py -b $(BUILD_DIR) -v

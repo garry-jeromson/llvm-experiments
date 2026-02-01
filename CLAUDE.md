@@ -56,8 +56,14 @@ make rebuild       # Incremental rebuild after changes
 # Run W65816 FileCheck tests (uses llvm-lit)
 make test-w65816
 
+# Run integration tests (LLVM IR execution)
+make test-integration
+
+# Run C integration tests (C code execution)
+make test-c-integration
+
 # Workflow after making changes:
-make rebuild && make test-w65816
+make rebuild && make test-w65816 && make test-integration
 ```
 
 ### Integration Tests (Execution Verification)
@@ -173,6 +179,40 @@ The test runner applies relocations to link symbols:
 - `R_W65816_24`: 24-bit long address (bank + offset)
 
 This allows tests with function calls and global variables to work correctly.
+
+### C Integration Tests
+
+Location: `test/c-integration/tests/`
+
+C tests compile through Clang and execute in the emulator:
+
+```bash
+make test-c-integration         # Run C integration tests
+make test-c-integration-verbose # With verbose output
+```
+
+**Test Format:**
+```c
+// INTEGRATION-TEST
+// EXPECT: 42
+// SKIP: reason (optional)
+
+int test_main(void) {
+    return 42;
+}
+```
+
+**Test Categories:**
+
+| Category | Tests | Description |
+|----------|-------|-------------|
+| `arithmetic/` | add, sub, neg, shifts, bitwise, inc_dec | Basic arithmetic operations |
+| `control_flow/` | if_else, while_loop, for_loop, switch, ternary, function_call, nested_calls | Control flow patterns |
+| `memory/` | array, struct, pointer, global | Memory operations |
+| `register_pressure/` | four_vars, five_vars, nested_calls, phi_stress, diamond_phi, loop_accum | Stress tests for register allocation |
+| `real_world/` | fibonacci, array_sum, state_machine, bubble_sort, max_min | Practical patterns |
+
+**Current Status:** 35 passing, 2 skipped (mul/div require runtime library)
 
 ---
 
