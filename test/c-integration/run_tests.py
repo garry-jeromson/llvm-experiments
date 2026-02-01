@@ -33,6 +33,41 @@ import tempfile
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+# Runtime library configuration
+# Placed at $C000 in ROM
+RUNTIME_BASE_ADDR = 0xC000
+
+# Runtime symbol offsets (relative to RUNTIME_BASE_ADDR)
+# These must match the assembly in runtime/c_runtime.s
+RUNTIME_SYMBOLS = {
+    '__mulhi3':  0x00,   # Unsigned multiplication
+    '__udivhi3': 0x17,   # Unsigned division
+    '__divhi3':  0x3B,   # Signed division
+    '__umodhi3': 0x65,   # Unsigned modulo
+    '__modhi3':  0x82,   # Signed modulo
+}
+
+# Global to hold loaded runtime binary
+_runtime_binary = None
+
+def load_runtime(build_dir):
+    """Load the runtime library binary from the build directory."""
+    global _runtime_binary
+    if _runtime_binary is not None:
+        return _runtime_binary
+
+    runtime_bin = Path(build_dir) / 'w65816-runtime' / 'c_runtime.bin'
+    if not runtime_bin.exists():
+        raise FileNotFoundError(
+            f"Runtime binary not found at {runtime_bin}\n"
+            "Build it with: make build-c-runtime"
+        )
+
+    with open(runtime_bin, 'rb') as f:
+        _runtime_binary = f.read()
+
+    return _runtime_binary
+
 # ANSI colors
 class Colors:
     GREEN = '\033[92m'
@@ -304,10 +339,16 @@ def apply_relocations(code_bytes, data_bytes, rodata_bytes, elf_data, code_addr,
 
         # Calculate symbol address
         if sym['shndx'] == 0:  # SHN_UNDEF
-            continue
-
-        sym_section_addr = section_addrs.get(sym['shndx'], 0)
-        sym_addr = sym_section_addr + sym['value'] + addend
+            # Check if it's a runtime library symbol
+            sym_name = sym['name']
+            if sym_name in RUNTIME_SYMBOLS:
+                sym_addr = RUNTIME_BASE_ADDR + RUNTIME_SYMBOLS[sym_name] + addend
+            else:
+                # Unknown undefined symbol - skip
+                continue
+        else:
+            sym_section_addr = section_addrs.get(sym['shndx'], 0)
+            sym_addr = sym_section_addr + sym['value'] + addend
 
         # Apply relocation
         if rtype == R_W65816_16:
@@ -381,7 +422,7 @@ def find_test_main_offset(elf_data):
     # Fallback: assume test_main is at the start
     return 0
 
-def create_test_binary(code_bytes, data_bytes=b'', rodata_bytes=b'', load_addr=0x8000, elf_data=None):
+def create_test_binary(code_bytes, data_bytes=b'', rodata_bytes=b'', load_addr=0x8000, elf_data=None, runtime_binary=None):
     """Create a complete test binary with startup code and vectors."""
     # Startup layout:
     #   0:      CLC
@@ -443,6 +484,11 @@ def create_test_binary(code_bytes, data_bytes=b'', rodata_bytes=b'', load_addr=0
         rodata_offset = code_offset + len(code_bytes) + len(data_bytes)
         rom[rodata_offset:rodata_offset + len(rodata_bytes)] = rodata_bytes
 
+    # Copy runtime library at $C000 (offset $4000 from $8000)
+    if runtime_binary:
+        runtime_offset = RUNTIME_BASE_ADDR - load_addr
+        rom[runtime_offset:runtime_offset + len(runtime_binary)] = runtime_binary
+
     # Set up vectors
     vectors_offset = 0x7FFA
     rom[vectors_offset:vectors_offset + 2] = bytes([load_addr & 0xFF, (load_addr >> 8) & 0xFF])
@@ -451,7 +497,7 @@ def create_test_binary(code_bytes, data_bytes=b'', rodata_bytes=b'', load_addr=0
 
     return bytes(rom)
 
-def run_test(test_file, tools, runner_bin, verbose=False):
+def run_test(test_file, tools, runner_bin, build_dir, verbose=False):
     """Compile and run a single test."""
     test_name = Path(test_file).stem
 
@@ -467,6 +513,12 @@ def run_test(test_file, tools, runner_bin, verbose=False):
     expected = metadata['expect']
     if expected is None:
         return TestResult(test_name, None, None, None, error="No EXPECT directive")
+
+    # Load runtime library
+    try:
+        runtime_binary = load_runtime(build_dir)
+    except FileNotFoundError as e:
+        return TestResult(test_name, False, expected, None, error=str(e))
 
     with tempfile.TemporaryDirectory() as tmpdir:
         try:
@@ -497,8 +549,9 @@ def run_test(test_file, tools, runner_bin, verbose=False):
             data_bytes = extract_data_section(elf_data)
             rodata_bytes = extract_rodata_section(elf_data)
 
-            # Create complete test binary
-            binary = create_test_binary(code_bytes, data_bytes, rodata_bytes, elf_data=elf_data)
+            # Create complete test binary with runtime library
+            binary = create_test_binary(code_bytes, data_bytes, rodata_bytes,
+                                       elf_data=elf_data, runtime_binary=runtime_binary)
 
             with open(bin_file, 'wb') as f:
                 f.write(binary)
@@ -595,14 +648,14 @@ def main():
     if args.jobs > 1:
         with ThreadPoolExecutor(max_workers=args.jobs) as executor:
             futures = {
-                executor.submit(run_test, str(tf), tools, runner_bin, args.verbose): tf
+                executor.submit(run_test, str(tf), tools, runner_bin, args.build_dir, args.verbose): tf
                 for tf in test_files
             }
             for future in as_completed(futures):
                 results.append(future.result())
     else:
         for tf in test_files:
-            result = run_test(str(tf), tools, runner_bin, args.verbose)
+            result = run_test(str(tf), tools, runner_bin, args.build_dir, args.verbose)
             results.append(result)
 
             # Print result immediately

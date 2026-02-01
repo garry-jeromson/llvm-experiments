@@ -1,6 +1,5 @@
 // INTEGRATION-TEST
 // EXPECT: 5
-// SKIP: Requires runtime library linkage
 
 int test_main(void) {
     int a = 25;

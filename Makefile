@@ -708,9 +708,19 @@ run-snes-bounce-demo: build-snes-bounce-demo
 # W65816 C Integration Testing
 # =============================================================================
 
-test-c-integration: build-test-runner
+C_RUNTIME_DIR := $(ROOT_DIR)/test/c-integration/runtime
+C_RUNTIME_BUILD_DIR := $(BUILD_DIR)/w65816-runtime
+
+build-c-runtime: deps-runtime
+	@echo "$(BLUE)Building C integration test runtime...$(NC)"
+	@mkdir -p $(C_RUNTIME_BUILD_DIR)
+	@ca65 --cpu 65816 -o $(C_RUNTIME_BUILD_DIR)/c_runtime.o $(C_RUNTIME_DIR)/c_runtime.s
+	@ld65 -C $(C_RUNTIME_DIR)/c_runtime.cfg -o $(C_RUNTIME_BUILD_DIR)/c_runtime.bin $(C_RUNTIME_BUILD_DIR)/c_runtime.o
+	@echo "$(GREEN)C runtime built: $(C_RUNTIME_BUILD_DIR)/c_runtime.bin$(NC)"
+
+test-c-integration: build-test-runner build-c-runtime
 	@echo "$(BLUE)Running W65816 C integration tests...$(NC)"
 	@python3 test/c-integration/run_tests.py -b $(BUILD_DIR)
 
-test-c-integration-verbose: build-test-runner
+test-c-integration-verbose: build-test-runner build-c-runtime
 	@python3 test/c-integration/run_tests.py -b $(BUILD_DIR) -v
