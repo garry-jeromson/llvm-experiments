@@ -37,36 +37,80 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # Placed at $C000 in ROM
 RUNTIME_BASE_ADDR = 0xC000
 
-# Runtime symbol offsets (relative to RUNTIME_BASE_ADDR)
-# These must match the assembly in runtime/c_runtime.s
-RUNTIME_SYMBOLS = {
-    '__mulhi3':  0x00,   # Unsigned multiplication
-    '__udivhi3': 0x17,   # Unsigned division
-    '__divhi3':  0x3B,   # Signed division
-    '__umodhi3': 0x65,   # Unsigned modulo
-    '__modhi3':  0x82,   # Signed modulo
-}
-
-# Global to hold loaded runtime binary
+# Global to hold loaded runtime binary and symbols
 _runtime_binary = None
+_runtime_symbols = None
+
+def parse_runtime_map(map_path, listing_path):
+    """Parse ld65 map file and ca65 listing to extract symbol addresses."""
+    symbols = {}
+
+    # Get CODE segment start address from map file
+    code_start = RUNTIME_BASE_ADDR
+    with open(map_path, 'r') as f:
+        for line in f:
+            # Look for CODE segment line: CODE  00C000  00C166  000167  00001
+            if line.strip().startswith('CODE'):
+                parts = line.split()
+                if len(parts) >= 2:
+                    try:
+                        code_start = int(parts[1], 16)
+                    except ValueError:
+                        pass
+                break
+
+    # Parse listing file to get function offsets
+    # Lines look like: 000000r 1               .proc __mulhi3
+    with open(listing_path, 'r') as f:
+        for line in f:
+            if '.proc ' in line:
+                parts = line.split()
+                if len(parts) >= 3 and parts[2] == '.proc':
+                    offset_str = parts[0].rstrip('r')  # Remove 'r' suffix
+                    func_name = parts[3] if len(parts) > 3 else ''
+                    try:
+                        offset = int(offset_str, 16)
+                        if func_name:
+                            symbols[func_name] = code_start + offset
+                    except ValueError:
+                        continue
+
+    return symbols
 
 def load_runtime(build_dir):
-    """Load the runtime library binary from the build directory."""
-    global _runtime_binary
+    """Load the runtime library binary and symbol table from the build directory."""
+    global _runtime_binary, _runtime_symbols
     if _runtime_binary is not None:
-        return _runtime_binary
+        return _runtime_binary, _runtime_symbols
 
-    runtime_bin = Path(build_dir) / 'w65816-runtime' / 'c_runtime.bin'
+    runtime_bin = Path(build_dir) / 'w65816-runtime' / 'w65816_runtime.bin'
+    runtime_map = Path(build_dir) / 'w65816-runtime' / 'w65816_runtime.map'
+    runtime_lst = Path(build_dir) / 'w65816-runtime' / 'w65816_runtime.lst'
+
     if not runtime_bin.exists():
         raise FileNotFoundError(
             f"Runtime binary not found at {runtime_bin}\n"
             "Build it with: make build-c-runtime"
         )
 
+    if not runtime_map.exists():
+        raise FileNotFoundError(
+            f"Runtime map file not found at {runtime_map}\n"
+            "Build it with: make build-c-runtime"
+        )
+
+    if not runtime_lst.exists():
+        raise FileNotFoundError(
+            f"Runtime listing file not found at {runtime_lst}\n"
+            "Build it with: make build-c-runtime"
+        )
+
     with open(runtime_bin, 'rb') as f:
         _runtime_binary = f.read()
 
-    return _runtime_binary
+    _runtime_symbols = parse_runtime_map(runtime_map, runtime_lst)
+
+    return _runtime_binary, _runtime_symbols
 
 # ANSI colors
 class Colors:
@@ -296,11 +340,14 @@ def extract_rodata_section(elf_data):
 
     return b''
 
-def apply_relocations(code_bytes, data_bytes, rodata_bytes, elf_data, code_addr, data_addr, rodata_addr):
+def apply_relocations(code_bytes, data_bytes, rodata_bytes, elf_data, code_addr, data_addr, rodata_addr, runtime_symbols=None):
     """Apply relocations to code, data, and rodata sections."""
     code = bytearray(code_bytes)
     data = bytearray(data_bytes) if data_bytes else bytearray()
     rodata = bytearray(rodata_bytes) if rodata_bytes else bytearray()
+
+    if runtime_symbols is None:
+        runtime_symbols = {}
 
     sections = parse_elf(elf_data)
     symbols = get_symbols(elf_data, sections)
@@ -341,8 +388,8 @@ def apply_relocations(code_bytes, data_bytes, rodata_bytes, elf_data, code_addr,
         if sym['shndx'] == 0:  # SHN_UNDEF
             # Check if it's a runtime library symbol
             sym_name = sym['name']
-            if sym_name in RUNTIME_SYMBOLS:
-                sym_addr = RUNTIME_BASE_ADDR + RUNTIME_SYMBOLS[sym_name] + addend
+            if sym_name in runtime_symbols:
+                sym_addr = runtime_symbols[sym_name] + addend
             else:
                 # Unknown undefined symbol - skip
                 continue
@@ -422,7 +469,7 @@ def find_test_main_offset(elf_data):
     # Fallback: assume test_main is at the start
     return 0
 
-def create_test_binary(code_bytes, data_bytes=b'', rodata_bytes=b'', load_addr=0x8000, elf_data=None, runtime_binary=None):
+def create_test_binary(code_bytes, data_bytes=b'', rodata_bytes=b'', load_addr=0x8000, elf_data=None, runtime_binary=None, runtime_symbols=None):
     """Create a complete test binary with startup code and vectors."""
     # Startup layout:
     #   0:      CLC
@@ -446,7 +493,7 @@ def create_test_binary(code_bytes, data_bytes=b'', rodata_bytes=b'', load_addr=0
 
     if elf_data:
         code_bytes, data_bytes, rodata_bytes = apply_relocations(
-            code_bytes, data_bytes, rodata_bytes, elf_data, code_addr, data_addr, rodata_addr
+            code_bytes, data_bytes, rodata_bytes, elf_data, code_addr, data_addr, rodata_addr, runtime_symbols
         )
 
     test_main_addr = code_addr + test_main_offset
@@ -514,9 +561,9 @@ def run_test(test_file, tools, runner_bin, build_dir, verbose=False):
     if expected is None:
         return TestResult(test_name, None, None, None, error="No EXPECT directive")
 
-    # Load runtime library
+    # Load runtime library and symbols
     try:
-        runtime_binary = load_runtime(build_dir)
+        runtime_binary, runtime_symbols = load_runtime(build_dir)
     except FileNotFoundError as e:
         return TestResult(test_name, False, expected, None, error=str(e))
 
@@ -551,7 +598,8 @@ def run_test(test_file, tools, runner_bin, build_dir, verbose=False):
 
             # Create complete test binary with runtime library
             binary = create_test_binary(code_bytes, data_bytes, rodata_bytes,
-                                       elf_data=elf_data, runtime_binary=runtime_binary)
+                                       elf_data=elf_data, runtime_binary=runtime_binary,
+                                       runtime_symbols=runtime_symbols)
 
             with open(bin_file, 'wb') as f:
                 f.write(binary)

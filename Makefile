@@ -708,15 +708,16 @@ run-snes-bounce-demo: build-snes-bounce-demo
 # W65816 C Integration Testing
 # =============================================================================
 
-C_RUNTIME_DIR := $(ROOT_DIR)/test/c-integration/runtime
+LLVM_RUNTIME_SRC := $(ROOT_DIR)/src/llvm-project/llvm/lib/Target/W65816/runtime/w65816_runtime.s
+LLVM_RUNTIME_CFG := $(ROOT_DIR)/test/c-integration/runtime/llvm_runtime.cfg
 C_RUNTIME_BUILD_DIR := $(BUILD_DIR)/w65816-runtime
 
 build-c-runtime: deps-runtime
-	@echo "$(BLUE)Building C integration test runtime...$(NC)"
+	@echo "$(BLUE)Building W65816 runtime library...$(NC)"
 	@mkdir -p $(C_RUNTIME_BUILD_DIR)
-	@ca65 --cpu 65816 -o $(C_RUNTIME_BUILD_DIR)/c_runtime.o $(C_RUNTIME_DIR)/c_runtime.s
-	@ld65 -C $(C_RUNTIME_DIR)/c_runtime.cfg -o $(C_RUNTIME_BUILD_DIR)/c_runtime.bin $(C_RUNTIME_BUILD_DIR)/c_runtime.o
-	@echo "$(GREEN)C runtime built: $(C_RUNTIME_BUILD_DIR)/c_runtime.bin$(NC)"
+	@ca65 --cpu 65816 --listing $(C_RUNTIME_BUILD_DIR)/w65816_runtime.lst -o $(C_RUNTIME_BUILD_DIR)/w65816_runtime.o $(LLVM_RUNTIME_SRC)
+	@ld65 -C $(LLVM_RUNTIME_CFG) -m $(C_RUNTIME_BUILD_DIR)/w65816_runtime.map -o $(C_RUNTIME_BUILD_DIR)/w65816_runtime.bin $(C_RUNTIME_BUILD_DIR)/w65816_runtime.o
+	@echo "$(GREEN)W65816 runtime built: $(C_RUNTIME_BUILD_DIR)/w65816_runtime.bin$(NC)"
 
 test-c-integration: build-test-runner build-c-runtime
 	@echo "$(BLUE)Running W65816 C integration tests...$(NC)"
