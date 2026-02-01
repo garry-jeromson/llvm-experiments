@@ -117,16 +117,34 @@ reset:
     lda #$20                ; BG1=$0000>>12=0, BG2=$2000>>12=2
     sta $210B               ; BG12NBA
 
+    ; BG3 tilemap at VRAM $1C00, 32x32 tiles (for menu text overlay)
+    lda #$1C                ; ($1C00 >> 9) | size=0
+    sta $2109               ; BG3SC
+
+    ; BG3 character data at VRAM $4000, BG4 unused
+    ; Low nibble = BG3 base >> 12, High nibble = BG4 base >> 12
+    lda #$04                ; BG3=$4000>>12=4, BG4=0
+    sta $210C               ; BG34NBA
+
+    ; Load font tiles to VRAM $4000 (for BG3 text)
+    jsr load_font
+
     ; Load parallax tiles and tilemaps
     jsr load_mountain_tiles     ; BG1 tiles at $0000
     jsr load_hill_tiles         ; BG2 tiles at $2000
     jsr load_mountain_tilemap   ; BG1 tilemap at $1000
     jsr load_hill_tilemap       ; BG2 tilemap at $1800
 
+    ; Load menu text to BG3 tilemap at $1C00
+    jsr load_menu_tilemap
+
     ; Load parallax palettes
     ; BG1 uses CGRAM 0-3, BG2 uses CGRAM 32-35
     jsr load_parallax_palette
     jsr load_bg2_palette
+
+    ; Load text palette for BG3 (palette 2, CGRAM colors 64-67)
+    jsr load_text_palette
 
     ; === SPRITE SETUP ===
     ; OBSEL: sprite size and base address
@@ -136,9 +154,9 @@ reset:
     ; Load player sprite palette (sprite palette 0, colors 128-143)
     jsr load_player_palette
 
-    ; Enable BG1, BG2 and sprites on main screen
-    lda #$13                ; Bit 0 = BG1, Bit 1 = BG2, Bit 4 = OBJ
-    sta $212C               ; TM = BG1 + BG2 + OBJ enabled
+    ; Enable BG1, BG2, BG3 and sprites on main screen
+    lda #$17                ; Bit 0 = BG1, Bit 1 = BG2, Bit 2 = BG3, Bit 4 = OBJ
+    sta $212C               ; TM = BG1 + BG2 + BG3 + OBJ enabled
 
     ; Load sprite graphics to VRAM
     jsr load_sprites
@@ -157,15 +175,15 @@ forever:
     bra forever
 
 
-; Load font data into VRAM at $0000
+; Load font data into VRAM at $4000 (for BG3 text)
 ; Called with 8-bit A mode
 load_font:
     php                     ; Save processor status
     rep #$20                ; 16-bit A
     .a16
 
-    ; Set VRAM address to $0000
-    lda #$0000
+    ; Set VRAM address to $4000
+    lda #$4000
     sta $2116               ; VMADDL/VMADDH
 
     ; Set up for word writes, increment on high byte write
@@ -189,6 +207,351 @@ load_font:
     bcc @font_loop
 
     plp                     ; Restore processor status
+    rts
+
+
+; Load menu tilemap into VRAM at $1C00 (BG3 tilemap)
+; Text uses font tiles (ASCII - 32 = tile number)
+; Palette 2 (bits 10-12 of tilemap entry) = $2000
+load_menu_tilemap:
+    php
+    rep #$20
+    .a16
+
+    ; Set VRAM address to $1C00
+    lda #$1C00
+    sta $2116
+
+    sep #$20
+    .a8
+    lda #$80
+    sta $2115               ; VMAIN: increment on high byte
+
+    rep #$20
+    .a16
+
+    ; Clear tilemap (32x32 = 1024 entries, 2 bytes each)
+    ldx #0
+@clear:
+    stz $2118
+    inx
+    cpx #1024
+    bcc @clear
+
+    ; Now write menu text at specific positions
+    ; Row 2, Col 4: "TECH DEMO"
+    ; Tilemap address = $1C00 + (row * 32 + col) * 2
+    ; Row 2, Col 4 = $1C00 + (2*32 + 4) = $1C00 + 68 = $1C44
+    lda #$1C44
+    sta $2116
+    sep #$20
+    .a8
+    ; "TECH DEMO" - tile = ASCII - 32, palette 2 = $20 high byte
+    lda #('T'-32)
+    sta $2118
+    lda #$20                ; Palette 2
+    sta $2119
+    lda #('E'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('C'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('H'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #(' '-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('D'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('E'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('M'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('O'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+
+    ; Row 5, Col 4: "1. PARALLAX"
+    rep #$20
+    .a16
+    lda #$1CA4              ; $1C00 + (5*32 + 4) = $1C00 + 164 = $1CA4
+    sta $2116
+    sep #$20
+    .a8
+    lda #('1'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('.'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #(' '-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('P'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('A'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('R'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('A'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('L'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('L'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('A'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('X'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+
+    ; Row 7, Col 4: "2. MOSAIC"
+    rep #$20
+    .a16
+    lda #$1CE4              ; $1C00 + (7*32 + 4) = $1C00 + 228 = $1CE4
+    sta $2116
+    sep #$20
+    .a8
+    lda #('2'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('.'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #(' '-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('M'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('O'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('S'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('A'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('I'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('C'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+
+    ; Row 9, Col 4: "3. INPUT"
+    rep #$20
+    .a16
+    lda #$1D24              ; $1C00 + (9*32 + 4) = $1C00 + 292 = $1D24
+    sta $2116
+    sep #$20
+    .a8
+    lda #('3'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('.'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #(' '-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('I'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('N'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('P'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('U'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('T'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+
+    ; Row 11, Col 4: "4. PALETTE"
+    rep #$20
+    .a16
+    lda #$1D64              ; $1C00 + (11*32 + 4) = $1C00 + 356 = $1D64
+    sta $2116
+    sep #$20
+    .a8
+    lda #('4'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('.'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #(' '-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('P'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('A'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('L'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('E'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('T'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('T'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('E'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+
+    ; Row 13, Col 4: "5. SPRITES"
+    rep #$20
+    .a16
+    lda #$1DA4              ; $1C00 + (13*32 + 4) = $1C00 + 420 = $1DA4
+    sta $2116
+    sep #$20
+    .a8
+    lda #('5'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('.'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #(' '-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('S'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('P'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('R'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('I'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('T'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('E'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+    lda #('S'-32)
+    sta $2118
+    lda #$20
+    sta $2119
+
+    plp
+    rts
+
+
+; Load text palette (palette 2 for BG3, CGRAM 64-67)
+; Color 0 = transparent, Color 1 = white
+load_text_palette:
+    php
+    sep #$20
+    .a8
+
+    lda #64                 ; BG3 palette 2 starts at CGRAM 64
+    sta $2121
+
+    ; Color 0: transparent (black, will be transparent due to color 0 rule)
+    lda #$00
+    sta $2122
+    sta $2122
+
+    ; Color 1: white ($7FFF = 15-bit white)
+    lda #$FF
+    sta $2122
+    lda #$7F
+    sta $2122
+
+    ; Colors 2-3: also white for simplicity
+    lda #$FF
+    sta $2122
+    lda #$7F
+    sta $2122
+    lda #$FF
+    sta $2122
+    lda #$7F
+    sta $2122
+
+    plp
     rts
 
 

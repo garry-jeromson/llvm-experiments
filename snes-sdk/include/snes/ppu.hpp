@@ -32,9 +32,14 @@ inline void screen_off() {
     hal::write8(reg::INIDISP::address, 0x80);
 }
 
-// Wait for vertical blank period
+// Wait for next vertical blank period
+// First wait for vblank to end (if in vblank), then wait for it to start
 inline void wait_vblank() {
-    while ((hal::read8(reg::HVBJOY::address) & 0x80) == 0) {}
+    volatile u8* hvbjoy = reinterpret_cast<volatile u8*>(0x4212);
+    // Wait for vblank to end (bit 7 clear)
+    while (*hvbjoy & 0x80) {}
+    // Wait for vblank to start (bit 7 set)
+    while ((*hvbjoy & 0x80) == 0) {}
 }
 
 // ============================================================================
@@ -109,6 +114,12 @@ inline void set_bg2hofs_lo(u8 lo) { hal::write8(reg::BG2HOFS::address, lo); }
 inline void set_bg2hofs_hi(u8 hi) { hal::write8(reg::BG2HOFS::address, hi); }
 inline void set_bg2vofs_lo(u8 lo) { hal::write8(reg::BG2VOFS::address, lo); }
 inline void set_bg2vofs_hi(u8 hi) { hal::write8(reg::BG2VOFS::address, hi); }
+
+// BG3 scroll
+inline void set_bg3hofs_lo(u8 lo) { hal::write8(reg::BG3HOFS::address, lo); }
+inline void set_bg3hofs_hi(u8 hi) { hal::write8(reg::BG3HOFS::address, hi); }
+inline void set_bg3vofs_lo(u8 lo) { hal::write8(reg::BG3VOFS::address, lo); }
+inline void set_bg3vofs_hi(u8 hi) { hal::write8(reg::BG3VOFS::address, hi); }
 
 // ============================================================================
 // Main/Sub Screen Designation
@@ -214,6 +225,103 @@ inline void set_das0h(u8 hi) { hal::write8(reg::DMA<0>::SIZEH::address, hi); }
 inline void start_dma(u8 mask) { hal::write8(reg::MDMAEN::address, mask); }
 
 // ============================================================================
+// Mosaic Effect
+// ============================================================================
+
+// Set mosaic size and enable for backgrounds
+// size: 0-15 (0=1x1, 1=2x2, ..., 15=16x16)
+// bg_mask: bit 0=BG1, bit 1=BG2, bit 2=BG3, bit 3=BG4
+inline void set_mosaic(u8 size, u8 bg_mask) {
+    hal::write8(reg::MOSAIC::address, ((size & 0x0F) << 4) | (bg_mask & 0x0F));
+}
+
+// ============================================================================
+// Mode 7 Settings
+// ============================================================================
+
+// Set Mode 7 selection register
+// Bit 0: Screen flip H
+// Bit 1: Screen flip V
+// Bits 6-7: Screen over (0=wrap, 1=wrap, 2=transparent, 3=tile 0)
+inline void set_m7sel(u8 val) { hal::write8(reg::M7SEL::address, val); }
+
+// Mode 7 matrix parameters (all write twice: low then high byte)
+// M7A = cos(angle) * scale_x
+// M7B = sin(angle) * scale_x (also multiplicand for hardware multiply)
+// M7C = -sin(angle) * scale_y
+// M7D = cos(angle) * scale_y
+inline void set_m7a(i16 val) {
+    hal::write8(reg::M7A::address, val & 0xFF);
+    hal::write8(reg::M7A::address, val >> 8);
+}
+
+inline void set_m7b(i16 val) {
+    hal::write8(reg::M7B::address, val & 0xFF);
+    hal::write8(reg::M7B::address, val >> 8);
+}
+
+inline void set_m7c(i16 val) {
+    hal::write8(reg::M7C::address, val & 0xFF);
+    hal::write8(reg::M7C::address, val >> 8);
+}
+
+inline void set_m7d(i16 val) {
+    hal::write8(reg::M7D::address, val & 0xFF);
+    hal::write8(reg::M7D::address, val >> 8);
+}
+
+// Mode 7 center point (origin for rotation/scaling)
+inline void set_m7x(i16 val) {
+    hal::write8(reg::M7X::address, val & 0xFF);
+    hal::write8(reg::M7X::address, val >> 8);
+}
+
+inline void set_m7y(i16 val) {
+    hal::write8(reg::M7Y::address, val & 0xFF);
+    hal::write8(reg::M7Y::address, val >> 8);
+}
+
+// ============================================================================
+// HDMA Control
+// ============================================================================
+
+// Enable HDMA channels (bit mask for channels 0-7)
+inline void enable_hdma(u8 channels) { hal::write8(reg::HDMAEN::address, channels); }
+
+// Disable all HDMA
+inline void disable_hdma() { hal::write8(reg::HDMAEN::address, 0); }
+
+// ============================================================================
+// Color Math
+// ============================================================================
+
+// Set color math selection
+// Bits 0-1: Direct color / screen add/sub select
+// Bits 4-5: Main screen black enable
+// Bits 6-7: Color math enable
+inline void set_cgwsel(u8 val) { hal::write8(reg::CGWSEL::address, val); }
+
+// Set color math designation
+// Bits 0-5: Enable color math for BG1-4, OBJ, backdrop
+// Bit 6: Half color math
+// Bit 7: Add/subtract mode (0=add, 1=sub)
+inline void set_cgadsub(u8 val) { hal::write8(reg::CGADSUB::address, val); }
+
+// Set fixed color for color math
+// Bits 0-4: Color intensity (0-31)
+// Bit 5: Blue channel
+// Bit 6: Green channel
+// Bit 7: Red channel
+inline void set_coldata(u8 val) { hal::write8(reg::COLDATA::address, val); }
+
+// Set fixed color RGB values
+inline void set_fixed_color(u8 r, u8 g, u8 b) {
+    hal::write8(reg::COLDATA::address, 0x20 | (b & 0x1F));  // Blue
+    hal::write8(reg::COLDATA::address, 0x40 | (g & 0x1F));  // Green
+    hal::write8(reg::COLDATA::address, 0x80 | (r & 0x1F));  // Red
+}
+
+// ============================================================================
 // Helper Functions
 // ============================================================================
 
@@ -229,6 +337,27 @@ inline u8 make_bgsc(u16 vram_addr, u8 size) {
 // size: sprite size mode (0-7)
 inline u8 make_obsel(u16 base, u8 size) {
     return static_cast<u8>(((base >> 13) & 0x07) | ((size & 0x07) << 5));
+}
+
+// Mode 7 selection flags
+namespace m7sel {
+    constexpr u8 FLIP_H    = 0x01;  // Horizontal flip
+    constexpr u8 FLIP_V    = 0x02;  // Vertical flip
+    constexpr u8 OVER_WRAP = 0x00;  // Wrap on screen edges
+    constexpr u8 OVER_TRANSPARENT = 0x80;  // Transparent outside
+    constexpr u8 OVER_TILE0 = 0xC0;  // Use tile 0 outside
+}
+
+// Color math flags
+namespace cgadsub {
+    constexpr u8 BG1      = 0x01;
+    constexpr u8 BG2      = 0x02;
+    constexpr u8 BG3      = 0x04;
+    constexpr u8 BG4      = 0x08;
+    constexpr u8 OBJ      = 0x10;
+    constexpr u8 BACKDROP = 0x20;
+    constexpr u8 HALF     = 0x40;
+    constexpr u8 SUBTRACT = 0x80;
 }
 
 } // namespace snes::ppu

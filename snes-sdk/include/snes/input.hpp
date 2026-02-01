@@ -51,7 +51,9 @@ inline void enable_joypad() {
 // Wait for joypad auto-read to complete
 // Must call after VBlank before reading joypad registers
 inline void wait_for_joypad() {
-    while (hal::read8(reg::HVBJOY::address) & 0x01) {}
+    // Simple busy wait - check bit 0 of HVBJOY
+    volatile u8* hvbjoy = reinterpret_cast<volatile u8*>(0x4212);
+    while (*hvbjoy & 0x01) {}
 }
 
 // ============================================================================

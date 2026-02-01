@@ -92,6 +92,7 @@ def fix_llvm_asm_for_ca65(asm_path: str) -> str:
         # ca65 doesn't like dots in label names, so remove the leading dot
         if stripped.startswith('.L') and stripped.endswith(':'):
             # .LBB0_1: -> LBB0_1:
+            # .Ltmp0: -> Ltmp0:
             label = stripped[1:]  # Remove leading dot
             lines.append(label)
             continue
@@ -104,6 +105,12 @@ def fix_llvm_asm_for_ca65(asm_path: str) -> str:
         # e.g., "bra .LBB0_1" -> "bra LBB0_1"
         if '.LBB' in stripped:
             line = line.replace('.LBB', 'LBB')
+            lines.append(line)
+            continue
+
+        # Convert .Ltmp labels (from inline asm) to ca65 format
+        if '.Ltmp' in stripped:
+            line = line.replace('.Ltmp', 'Ltmp')
             lines.append(line)
             continue
 
@@ -214,29 +221,19 @@ def build(source_file: str, output_sfc: str):
         print(f"  Copied {source_file} to {ir_path}")
         print("\nStep 2: Skipped (already LLVM IR)")
     else:
-        # Compile C to LLVM IR
-        print("Step 1: Compile C to LLVM IR")
+        # Compile C/C++ to LLVM IR using native W65816 target
+        print("Step 1: Compile C/C++ to LLVM IR")
         run([
             str(project_root / "build" / "bin" / "clang"),
-            "-target", "msp430-unknown-none",
-            "-O2",
+            "-target", "w65816-unknown-none",
+            "-Os",
             "-S", "-emit-llvm",
             "-I", str(project_root / "snes"),
             "-I", str(project_root / "snes-sdk" / "include"),
             str(source_path),
             "-o", str(ir_path)
         ], "Running clang")
-
-        # Fix triple
-        print("\nStep 2: Fix target triple")
-        with open(ir_path, 'r') as f:
-            ir = f.read()
-        ir = ir.replace('msp430-unknown-none', 'w65816-unknown-none')
-        ir = ir.replace('target datalayout = "e-m:e-p:16:16-i32:16-i64:16-f32:16-f64:16-a:8-n8:16-S16"',
-                        'target datalayout = "e-m:e-p:16:16-i32:16-i64:16-f32:16-f64:16-a:8-n8:16-S16"')
-        with open(ir_path, 'w') as f:
-            f.write(ir)
-        print("  Triple changed to w65816-unknown-none")
+        print("\nStep 2: Skipped (native W65816 target)")
 
     c_basename = source_basename  # For compatibility with rest of function
 
@@ -264,20 +261,28 @@ def build(source_file: str, output_sfc: str):
         ca65_asm_path
     ], "Running ca65 on user code")
 
-    # Step 6: Assemble crt0
+    # Step 6: Assemble crt0 - check for local crt0.s first, then fall back to snes/
     print("\nStep 6: Assemble SNES startup (crt0)")
     crt0_obj = build_dir / "crt0.o"
+    local_crt0 = source_path.parent / "crt0.s"
+    if local_crt0.exists():
+        crt0_path = local_crt0
+        print(f"  Using local crt0.s from {source_path.parent}")
+    else:
+        crt0_path = project_root / "snes" / "crt0.s"
+        print(f"  Using default crt0.s from snes/")
     run([
         "ca65", "--cpu", "65816",
         "-o", str(crt0_obj),
-        str(project_root / "snes" / "crt0.s")
+        str(crt0_path)
     ], "Running ca65 on crt0")
 
-    # Step 6b: Assemble font data
-    print("\nStep 6b: Assemble font data")
+    link_objects = [str(crt0_obj)]
+
+    # Step 6b: Assemble base data files (font, sprites) from snes/ directory
+    print("\nStep 6b: Assemble base data files")
     font_obj = build_dir / "font.o"
     font_path = project_root / "snes" / "font.s"
-    link_objects = [str(crt0_obj)]
     if font_path.exists():
         run([
             "ca65", "--cpu", "65816",
@@ -288,8 +293,6 @@ def build(source_file: str, output_sfc: str):
     else:
         print("  No font.s found, skipping font assembly")
 
-    # Step 6c: Assemble sprite data
-    print("\nStep 6c: Assemble sprite data")
     sprites_obj = build_dir / "sprites.o"
     sprites_path = project_root / "snes" / "sprites.s"
     if sprites_path.exists():
@@ -302,17 +305,19 @@ def build(source_file: str, output_sfc: str):
     else:
         print("  No sprites.s found, skipping sprite assembly")
 
-    # Step 6c2: Assemble parallax data (if exists next to source file)
-    parallax_path = source_path.parent / "data" / "parallax.s"
-    if parallax_path.exists():
-        print("\nStep 6c2: Assemble parallax data")
-        parallax_obj = build_dir / "parallax.o"
-        run([
-            "ca65", "--cpu", "65816",
-            "-o", str(parallax_obj),
-            str(parallax_path)
-        ], "Running ca65 on parallax")
-        link_objects.append(str(parallax_obj))
+    # Step 6c: Assemble additional .s files in data/ directory (if exists)
+    data_dir = source_path.parent / "data"
+    if data_dir.exists() and data_dir.is_dir():
+        print("\nStep 6c: Assemble project data files")
+        for data_file in sorted(data_dir.glob("*.s")):
+            obj_name = data_file.stem + ".o"
+            obj_path = build_dir / obj_name
+            run([
+                "ca65", "--cpu", "65816",
+                "-o", str(obj_path),
+                str(data_file)
+            ], f"Running ca65 on {data_file.name}")
+            link_objects.append(str(obj_path))
 
     # Step 6d: Assemble runtime library (for mul, div, etc.)
     print("\nStep 6d: Assemble runtime library")
