@@ -682,15 +682,16 @@ def main():
     parser.add_argument('--list', action='store_true',
                        help='List tests without running')
     parser.add_argument('-O', '--opt-levels', nargs='+', default=['O2'],
-                       choices=['O0', 'O1', 'O2', 'O3', 'Os', 'Oz'],
-                       help='Optimization levels to test (default: O2). Use "all" for O0,O1,O2,O3')
+                       choices=['O1', 'O2', 'O3', 'Os', 'Oz'],
+                       help='Optimization levels to test (default: O2). Note: O0 not supported by W65816')
     parser.add_argument('--all-opts', action='store_true',
-                       help='Test all optimization levels (O0, O1, O2, O3)')
+                       help='Test all supported optimization levels (O1, O2, O3)')
     args = parser.parse_args()
 
     # Handle --all-opts flag
+    # Note: O0 is not supported by the W65816 target
     if args.all_opts:
-        args.opt_levels = ['O0', 'O1', 'O2', 'O3']
+        args.opt_levels = ['O1', 'O2', 'O3']
 
     # Find the runner binary
     runner_bin = os.path.join(args.build_dir, 'bin', 'w65816-runner')
