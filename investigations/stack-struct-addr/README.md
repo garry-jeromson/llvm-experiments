@@ -1,5 +1,10 @@
 # Stack-Struct-Addr Bug Investigation
 
+**STATUS: RESOLVED**
+
+The bug was found in `W65816FrameLowering.cpp` - the epilogue for large stack
+frames (StackSize > 8) was broken. See "Root Cause" section below.
+
 ## Problem Summary
 
 The `stack-struct-addr` integration test fails when **all** of these conditions are met:
@@ -119,10 +124,56 @@ The inline init stores might be getting scheduled after the function calls
 due to some optimization pass that doesn't account for the calls modifying
 the same memory locations.
 
+## Root Cause (FOUND)
+
+The bug was in `W65816FrameLowering.cpp::emitEpilogue()` for functions with
+`StackSize > 8`.
+
+The old epilogue code did:
+```asm
+PHA          ; Push return value (SP -= 2)
+TSX          ; Get SP
+TXA
+CLC
+ADC #N+2     ; Add frame size + 2 (for the PHA we just did)
+TAX
+TXS          ; Set new SP (moved PAST the pushed result!)
+PLA          ; Pop - but this pops from wrong location!
+```
+
+The problem: After `TXS`, the pushed return value was BELOW the new SP, so
+`PLA` popped from the wrong location (the prologue's saved A) instead of the
+result we just pushed.
+
+The fix: Use TAY/TYA to save the return value in Y register, avoiding the
+push/pop coordination issue:
+```asm
+TAY          ; Save return value to Y
+TSX          ; Get SP
+TXA
+CLC
+ADC #N+2     ; Add frame size + 2 (for prologue PHA)
+TAX
+TXS          ; Set new SP
+TYA          ; Restore return value from Y
+```
+
+This matches what the small frame epilogue (StackSize <= 8) already does.
+
 ## Files in This Investigation
 
 - `README.md` - This file
 - `01-no-inline-init.ll` - No inline init, both calls (PASS)
 - `02-define-both-call-one.ll` - Both inits, only write_first called (PASS)
 - `03-just-init-first.ll` - Both inits, only write_second called (PASS)
-- `failing-case.ll` - Copy of the failing test for reference
+- `04-minimal-both.ll` - Minimal reproducer
+- `05-only-inits.ll` - Only inline inits, no function calls
+- `06-inits-plus-write-first.ll` - Inits + write_first only
+- `07-both-writes-read-first.ll` - Both writes, read only first
+- `08-both-writes-read-second.ll` - Both writes, read only second
+- `09-read-both-return-first.ll` - Read both, return first
+- `10-read-both-add.ll` - Read both and add (the key failing pattern)
+- `11-large-frame-no-add.ll` - Large frame, no add
+- `12-minimal-large-frame.ll` - Minimal large frame test
+- `13-emulator-test.ll` - Simple stack-relative test that isolated the bug
+- `failing-case.ll` - Copy of the original failing test
