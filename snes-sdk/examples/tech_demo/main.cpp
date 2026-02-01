@@ -1,4 +1,4 @@
-// SNES SDK Tech Demo - Ultra-simplified for W65816 backend
+// SNES SDK Tech Demo
 //
 // Controls:
 //   D-pad Up/Down: Navigate menu
@@ -28,7 +28,6 @@ static volatile u8 pal_phase;
 // Menu delay counter for input repeat
 static volatile u8 menu_delay;
 
-__attribute__((noinline))
 static u8 menu_check_delay() {
     u8 d = menu_delay;
     if (d != 0) {
@@ -38,19 +37,16 @@ static u8 menu_check_delay() {
     return 0;
 }
 
-__attribute__((noinline))
 static void menu_nav_up() {
     if (menu_sel != 0) menu_sel = menu_sel - 1;
     menu_delay = 12;
 }
 
-__attribute__((noinline))
 static void menu_nav_down() {
     if (menu_sel != 4) menu_sel = menu_sel + 1;
     menu_delay = 12;
 }
 
-__attribute__((noinline))
 static void menu_update() {
     wait_for_joypad();
     if (menu_check_delay()) return;
@@ -63,7 +59,6 @@ static void menu_update() {
     if (lo & 0x80) g_state = menu_sel + 1;
 }
 
-__attribute__((noinline))
 static void menu_draw() {
     set_tm(SCREEN_BG1 | SCREEN_BG3 | SCREEN_OBJ);
     set_bg1hofs_lo(0);
@@ -79,7 +74,6 @@ static void menu_draw() {
 // Parallax
 // ============================================================
 
-__attribute__((noinline))
 static void parallax_update() {
     wait_for_joypad();
     u8 hi = read_joy1h();
@@ -91,7 +85,6 @@ static void parallax_update() {
     scroll_x = scroll_x + 1;
 }
 
-__attribute__((noinline))
 static void parallax_draw() {
     set_tm(SCREEN_BG1 | SCREEN_BG2 | SCREEN_OBJ);
     u16 sx = scroll_x;
@@ -110,7 +103,6 @@ static void parallax_draw() {
 // Mosaic - No frame counting, cycle every other frame approx
 // ============================================================
 
-__attribute__((noinline))
 static void mosaic_update() {
     wait_for_joypad();
     u8 hi = read_joy1h();
@@ -119,7 +111,6 @@ static void mosaic_update() {
     mosaic_lvl = (mosaic_lvl + 1) & 0x0F;
 }
 
-__attribute__((noinline))
 static void mosaic_draw() {
     set_tm(SCREEN_BG1 | SCREEN_BG2);
     set_mosaic(mosaic_lvl, 0x03);
@@ -134,7 +125,6 @@ static void mosaic_draw() {
 // Input Test
 // ============================================================
 
-__attribute__((noinline))
 static void input_update() {
     wait_for_joypad();
     u8 hi = read_joy1h();
@@ -147,7 +137,6 @@ static void input_update() {
     if (hi & 0x01) sprite_x = 160;
 }
 
-__attribute__((noinline))
 static void input_draw() {
     set_tm(SCREEN_BG1 | SCREEN_OBJ);
     set_oamaddr(0);
@@ -161,7 +150,6 @@ static void input_draw() {
 // Palette
 // ============================================================
 
-__attribute__((noinline))
 static void palette_update() {
     wait_for_joypad();
     u8 hi = read_joy1h();
@@ -169,7 +157,6 @@ static void palette_update() {
     pal_phase = pal_phase + 1;
 }
 
-__attribute__((noinline))
 static void palette_draw() {
     set_tm(SCREEN_BG1 | SCREEN_BG2);
     set_cgadd(1);
@@ -186,7 +173,6 @@ static void palette_draw() {
 // Sprite Animation
 // ============================================================
 
-__attribute__((noinline))
 static void sprite_update() {
     wait_for_joypad();
     u8 hi = read_joy1h();
@@ -198,7 +184,6 @@ static void sprite_update() {
     pal_phase = pal_phase + 1;  // reuse pal_phase as anim counter
 }
 
-__attribute__((noinline))
 static void sprite_draw() {
     set_tm(SCREEN_BG1 | SCREEN_OBJ);
     set_oamaddr(0);
