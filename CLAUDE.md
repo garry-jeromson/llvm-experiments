@@ -206,13 +206,21 @@ int test_main(void) {
 
 | Category | Tests | Description |
 |----------|-------|-------------|
-| `arithmetic/` | add, sub, neg, shifts, bitwise, inc_dec | Basic arithmetic operations |
-| `control_flow/` | if_else, while_loop, for_loop, switch, ternary, function_call, nested_calls | Control flow patterns |
-| `memory/` | array, struct, pointer, global | Memory operations |
-| `register_pressure/` | four_vars, five_vars, nested_calls, phi_stress, diamond_phi, loop_accum | Stress tests for register allocation |
-| `real_world/` | fibonacci, array_sum, state_machine, bubble_sort, max_min | Practical patterns |
+| `arithmetic/` | add, sub, neg, mul, div, mod, shifts, bitwise, signed ops | Basic arithmetic operations |
+| `control_flow/` | if_else, loops, switch, comparisons, break, early return | Control flow patterns |
+| `memory/` | arrays, structs, pointers, 2D arrays, memcpy, memset | Memory operations |
+| `register_pressure/` | 4-8 live vars, phi stress, nested diamonds, swap stress | Stress tests for register allocation |
+| `real_world/` | fibonacci, bubble sort, state machine | Practical patterns |
 
-**Current Status:** 35 passing, 2 skipped (mul/div require runtime library)
+**Current Status:** 77 passing tests
+
+**Runtime Library:**
+
+The tests use the LLVM runtime library (`src/llvm-project/llvm/lib/Target/W65816/runtime/w65816_runtime.s`) which provides:
+- `__mulhi3`, `__divhi3`, `__udivhi3`, `__modhi3`, `__umodhi3` - 16-bit arithmetic
+- `memcpy`, `memset`, `memmove` - Memory operations
+
+The runtime is automatically built and linked by `make test-c-integration`.
 
 ---
 
