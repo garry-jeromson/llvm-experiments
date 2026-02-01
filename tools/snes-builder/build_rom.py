@@ -66,6 +66,19 @@ def fix_llvm_asm_for_ca65(asm_path: str) -> str:
             # Convert .p2align N to .align N (ca65 uses byte count, not power of 2)
             # For simplicity, just skip alignment directives
             continue
+        if stripped.startswith('.local'):
+            # .local directive - just skip, ca65 doesn't need it
+            continue
+        if stripped.startswith('.comm'):
+            # .comm symbol,size,align -> symbol: .res size
+            # e.g., .comm frame_counter,2,2 -> frame_counter: .res 2
+            parts = stripped.replace(',', ' ').split()
+            if len(parts) >= 3:
+                symbol = parts[1]
+                size = parts[2]
+                lines.append('.segment "BSS"')
+                lines.append(f'{symbol}: .res {size}')
+            continue
 
         # Convert LLVM local labels (starting with .L) to ca65 format
         # ca65 doesn't like dots in label names, so remove the leading dot
