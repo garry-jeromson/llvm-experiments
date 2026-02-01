@@ -1,126 +1,96 @@
 #pragma once
 
+// SNES Input API - Header-only input functions for W65816 backend
+// All functions are inline single register reads/writes to avoid register pressure
+
 #include "types.hpp"
 #include "hal.hpp"
 #include "registers.hpp"
 
 namespace snes::input {
 
-// Button constants (strongly typed enum for type safety)
-enum class Button : u16 {
-    A      = 0x0080,
-    B      = 0x8000,
-    X      = 0x0040,
-    Y      = 0x4000,
-    L      = 0x0020,
-    R      = 0x0010,
-    Start  = 0x1000,
-    Select = 0x2000,
-    Up     = 0x0800,
-    Down   = 0x0400,
-    Left   = 0x0200,
-    Right  = 0x0100
-};
+// ============================================================================
+// Joypad Reading
+// ============================================================================
 
-// Enable bitwise operations on Button
-constexpr Button operator|(Button a, Button b) {
-    return static_cast<Button>(static_cast<u16>(a) | static_cast<u16>(b));
+// Read joypad 1 low byte (A, X, L, R buttons)
+inline u8 read_joy1l() { return hal::read8(reg::JOY1L::address); }
+
+// Read joypad 1 high byte (B, Y, Select, Start, D-pad)
+inline u8 read_joy1h() { return hal::read8(reg::JOY1H::address); }
+
+// Read full 16-bit joypad 1 state
+inline u16 read_joy1() {
+    u8 lo = hal::read8(reg::JOY1L::address);
+    u8 hi = hal::read8(reg::JOY1H::address);
+    return static_cast<u16>((hi << 8) | lo);
 }
 
-constexpr u16 operator&(u16 state, Button b) {
-    return state & static_cast<u16>(b);
+// Read joypad 2 low byte
+inline u8 read_joy2l() { return hal::read8(reg::JOY2L::address); }
+
+// Read joypad 2 high byte
+inline u8 read_joy2h() { return hal::read8(reg::JOY2H::address); }
+
+// Read full 16-bit joypad 2 state
+inline u16 read_joy2() {
+    u8 lo = hal::read8(reg::JOY2L::address);
+    u8 hi = hal::read8(reg::JOY2H::address);
+    return static_cast<u16>((hi << 8) | lo);
 }
 
-constexpr bool has_button(u16 state, Button b) {
-    return (state & static_cast<u16>(b)) != 0;
+// ============================================================================
+// Joypad Control
+// ============================================================================
+
+// Enable joypad auto-read (reads during VBlank)
+inline void enable_joypad() {
+    hal::write8(reg::NMITIMEN::address, nmi::JOYPAD_ENABLE);
 }
 
-// D-pad direction
-enum class Direction : u8 {
-    None  = 0,
-    Up    = 1,
-    Down  = 2,
-    Left  = 3,
-    Right = 4,
-    UpLeft    = 5,
-    UpRight   = 6,
-    DownLeft  = 7,
-    DownRight = 8
-};
+// Wait for joypad auto-read to complete
+// Must call after VBlank before reading joypad registers
+inline void wait_for_joypad() {
+    while (hal::read8(reg::HVBJOY::address) & 0x01) {}
+}
 
-// Joypad class - manages state for one controller
-class Joypad {
-    u8 m_id;
-    u16 m_current;
-    u16 m_previous;
+// ============================================================================
+// Button Masks - High Byte (joy1h / joy2h)
+// ============================================================================
 
-public:
-    explicit Joypad(u8 id) : m_id(id), m_current(0), m_previous(0) {}
+static constexpr u8 BTN_B      = 0x80;  // B button
+static constexpr u8 BTN_Y      = 0x40;  // Y button
+static constexpr u8 BTN_SELECT = 0x20;  // Select button
+static constexpr u8 BTN_START  = 0x10;  // Start button
+static constexpr u8 BTN_UP     = 0x08;  // D-pad up
+static constexpr u8 BTN_DOWN   = 0x04;  // D-pad down
+static constexpr u8 BTN_LEFT   = 0x02;  // D-pad left
+static constexpr u8 BTN_RIGHT  = 0x01;  // D-pad right
 
-    // Call once per frame after vblank to update state
-    void update();
+// ============================================================================
+// Button Masks - Low Byte (joy1l / joy2l)
+// ============================================================================
 
-    // Raw button state (all bits)
-    u16 raw() const { return m_current; }
+static constexpr u8 BTN_A      = 0x80;  // A button
+static constexpr u8 BTN_X      = 0x40;  // X button
+static constexpr u8 BTN_L      = 0x20;  // L shoulder
+static constexpr u8 BTN_R      = 0x10;  // R shoulder
 
-    // Check if button is currently held
-    bool held(Button b) const {
-        return has_button(m_current, b);
-    }
+// ============================================================================
+// 16-bit Button Masks (for use with read_joy1() / read_joy2())
+// ============================================================================
 
-    // Check if button was just pressed this frame
-    bool pressed(Button b) const {
-        return has_button(m_current, b) && !has_button(m_previous, b);
-    }
-
-    // Check if button was just released this frame
-    bool released(Button b) const {
-        return !has_button(m_current, b) && has_button(m_previous, b);
-    }
-
-    // Check multiple buttons at once (all must be held)
-    bool held_all(u16 buttons) const {
-        return (m_current & buttons) == buttons;
-    }
-
-    // Check multiple buttons at once (any must be held)
-    bool held_any(u16 buttons) const {
-        return (m_current & buttons) != 0;
-    }
-
-    // Get d-pad direction
-    Direction direction() const;
-
-    // Get raw X axis (-1 = left, 0 = center, 1 = right)
-    i8 axis_x() const {
-        if (held(Button::Left)) return -1;
-        if (held(Button::Right)) return 1;
-        return 0;
-    }
-
-    // Get raw Y axis (-1 = up, 0 = center, 1 = down)
-    i8 axis_y() const {
-        if (held(Button::Up)) return -1;
-        if (held(Button::Down)) return 1;
-        return 0;
-    }
-
-    // Controller ID (0-3)
-    u8 id() const { return m_id; }
-};
-
-// Global functions
-
-// Initialize input system (enables joypad auto-read)
-void init();
-
-// Wait for auto-read to complete (call after vblank)
-void wait_for_read();
-
-// Check if auto-read is in progress
-bool is_reading();
-
-// Read raw joypad data directly (bypasses Joypad class)
-u16 read_raw(u8 id);
+static constexpr u16 BTN16_B      = 0x8000;
+static constexpr u16 BTN16_Y      = 0x4000;
+static constexpr u16 BTN16_SELECT = 0x2000;
+static constexpr u16 BTN16_START  = 0x1000;
+static constexpr u16 BTN16_UP     = 0x0800;
+static constexpr u16 BTN16_DOWN   = 0x0400;
+static constexpr u16 BTN16_LEFT   = 0x0200;
+static constexpr u16 BTN16_RIGHT  = 0x0100;
+static constexpr u16 BTN16_A      = 0x0080;
+static constexpr u16 BTN16_X      = 0x0040;
+static constexpr u16 BTN16_L      = 0x0020;
+static constexpr u16 BTN16_R      = 0x0010;
 
 } // namespace snes::input

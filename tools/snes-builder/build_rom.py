@@ -80,6 +80,14 @@ def fix_llvm_asm_for_ca65(asm_path: str) -> str:
                 lines.append(f'{symbol}: .res {size}')
             continue
 
+        if stripped.startswith('.zero'):
+            # .zero N -> .res N (for BSS data)
+            parts = stripped.split()
+            if len(parts) >= 2:
+                size = parts[1]
+                lines.append(f'\t.res {size}')
+            continue
+
         # Convert LLVM local labels (starting with .L) to ca65 format
         # ca65 doesn't like dots in label names, so remove the leading dot
         if stripped.startswith('.L') and stripped.endswith(':'):
@@ -214,6 +222,7 @@ def build(source_file: str, output_sfc: str):
             "-O2",
             "-S", "-emit-llvm",
             "-I", str(project_root / "snes"),
+            "-I", str(project_root / "snes-sdk" / "include"),
             str(source_path),
             "-o", str(ir_path)
         ], "Running clang")
@@ -292,6 +301,18 @@ def build(source_file: str, output_sfc: str):
         link_objects.append(str(sprites_obj))
     else:
         print("  No sprites.s found, skipping sprite assembly")
+
+    # Step 6c2: Assemble parallax data (if exists next to source file)
+    parallax_path = source_path.parent / "data" / "parallax.s"
+    if parallax_path.exists():
+        print("\nStep 6c2: Assemble parallax data")
+        parallax_obj = build_dir / "parallax.o"
+        run([
+            "ca65", "--cpu", "65816",
+            "-o", str(parallax_obj),
+            str(parallax_path)
+        ], "Running ca65 on parallax")
+        link_objects.append(str(parallax_obj))
 
     # Step 6d: Assemble runtime library (for mul, div, etc.)
     print("\nStep 6d: Assemble runtime library")

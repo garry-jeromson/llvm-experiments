@@ -13,6 +13,14 @@
 ; Import sprite data from sprites.s
 .import sprite_data, sprite_data_size
 
+; Import parallax data (optional - for parallax demo)
+.import parallax_palette, parallax_palette_end
+.import mountain_tiles, mountain_tiles_end
+.import hill_tiles, hill_tiles_end
+.import mountain_tilemap, mountain_tilemap_end
+.import hill_tilemap, hill_tilemap_end
+.import player_palette, player_palette_end
+
 ; Export entry point
 .export reset, nmi_handler, irq_handler
 
@@ -96,57 +104,41 @@ reset:
     lda #$00
     sta $2105               ; BGMODE = 0
 
-    ; BG1 tilemap at VRAM $1000 (address bits 15-10 = $04, 32x32 tiles)
+    ; BG1 tilemap at VRAM $1000, 32x32 tiles
     lda #$10                ; ($1000 >> 9) | size=0
     sta $2107               ; BG1SC
 
-    ; BG1 character data at VRAM $0000
-    lda #$00
-    sta $210B               ; BG12NBA (BG1 uses low nibble)
+    ; BG2 tilemap at VRAM $1800, 32x32 tiles
+    lda #$18                ; ($1800 >> 9) | size=0
+    sta $2108               ; BG2SC
 
-    ; Load font into VRAM at $0000
-    jsr load_font
+    ; BG1 character data at VRAM $0000, BG2 at $2000
+    ; Low nibble = BG1 base >> 12, High nibble = BG2 base >> 12
+    lda #$20                ; BG1=$0000>>12=0, BG2=$2000>>12=2
+    sta $210B               ; BG12NBA
 
-    ; Set text palette (entries 0-3 for 2bpp)
-    stz $2121               ; CGRAM address 0
-    ; Color 0: Black (background)
-    stz $2122
-    stz $2122
-    ; Color 1: White (text foreground)
-    lda #$FF
-    sta $2122
-    lda #$7F
-    sta $2122
-    ; Color 2: Gray (unused)
-    lda #$10
-    sta $2122
-    lda #$42
-    sta $2122
-    ; Color 3: Gray (unused)
-    lda #$10
-    sta $2122
-    lda #$42
-    sta $2122
+    ; Load parallax tiles and tilemaps
+    jsr load_mountain_tiles     ; BG1 tiles at $0000
+    jsr load_hill_tiles         ; BG2 tiles at $2000
+    jsr load_mountain_tilemap   ; BG1 tilemap at $1000
+    jsr load_hill_tilemap       ; BG2 tilemap at $1800
+
+    ; Load parallax palettes
+    ; BG1 uses CGRAM 0-3, BG2 uses CGRAM 32-35
+    jsr load_parallax_palette
+    jsr load_bg2_palette
 
     ; === SPRITE SETUP ===
     ; OBSEL: sprite size and base address
-    ; Base 0 = VRAM $0000 for sprites (won't conflict with font at $0000-$0FFF)
-    ; Actually, let's use a different base to avoid conflict
     lda #$03                ; Base 3 = VRAM word $6000, size=0 (8x8/16x16)
     sta $2101               ; OBSEL
 
-    ; Set sprite palette 0, color 15 to yellow
-    ; Sprite palettes start at CGRAM 128
-    lda #$80 + 15           ; CGRAM address 128 + 15 = 143
-    sta $2121
-    lda #$FF                ; Yellow low byte
-    sta $2122
-    lda #$03                ; Yellow high byte
-    sta $2122
+    ; Load player sprite palette (sprite palette 0, colors 128-143)
+    jsr load_player_palette
 
-    ; Enable BG1 and sprites on main screen
-    lda #$11                ; Bit 0 = BG1, Bit 4 = OBJ
-    sta $212C               ; TM = BG1 + OBJ enabled
+    ; Enable BG1, BG2 and sprites on main screen
+    lda #$13                ; Bit 0 = BG1, Bit 1 = BG2, Bit 4 = OBJ
+    sta $212C               ; TM = BG1 + BG2 + OBJ enabled
 
     ; Load sprite graphics to VRAM
     jsr load_sprites
@@ -231,6 +223,190 @@ load_sprites:
     bcc @sprite_loop
 
     plp                     ; Restore processor status
+    rts
+
+
+; Load mountain tiles into VRAM at $0000 (BG1 character data)
+load_mountain_tiles:
+    php
+    rep #$20
+    .a16
+
+    lda #$0000
+    sta $2116               ; VRAM address
+
+    sep #$20
+    .a8
+    lda #$80
+    sta $2115               ; VMAIN: increment on high byte
+
+    rep #$20
+    .a16
+
+    ldx #0
+@loop:
+    lda mountain_tiles,x
+    sta $2118
+    inx
+    inx
+    cpx #(mountain_tiles_end - mountain_tiles)
+    bcc @loop
+
+    plp
+    rts
+
+
+; Load hill tiles into VRAM at $2000 (BG2 character data)
+load_hill_tiles:
+    php
+    rep #$20
+    .a16
+
+    lda #$2000
+    sta $2116               ; VRAM address
+
+    sep #$20
+    .a8
+    lda #$80
+    sta $2115               ; VMAIN
+
+    rep #$20
+    .a16
+
+    ldx #0
+@loop:
+    lda hill_tiles,x
+    sta $2118
+    inx
+    inx
+    cpx #(hill_tiles_end - hill_tiles)
+    bcc @loop
+
+    plp
+    rts
+
+
+; Load mountain tilemap into VRAM at $1000 (BG1 tilemap)
+load_mountain_tilemap:
+    php
+    rep #$20
+    .a16
+
+    lda #$1000
+    sta $2116               ; VRAM address
+
+    sep #$20
+    .a8
+    lda #$80
+    sta $2115               ; VMAIN
+
+    rep #$20
+    .a16
+
+    ldx #0
+@loop:
+    lda mountain_tilemap,x
+    sta $2118
+    inx
+    inx
+    cpx #(mountain_tilemap_end - mountain_tilemap)
+    bcc @loop
+
+    plp
+    rts
+
+
+; Load hill tilemap into VRAM at $1800 (BG2 tilemap)
+load_hill_tilemap:
+    php
+    rep #$20
+    .a16
+
+    lda #$1800
+    sta $2116               ; VRAM address
+
+    sep #$20
+    .a8
+    lda #$80
+    sta $2115               ; VMAIN
+
+    rep #$20
+    .a16
+
+    ldx #0
+@loop:
+    lda hill_tilemap,x
+    sta $2118
+    inx
+    inx
+    cpx #(hill_tilemap_end - hill_tilemap)
+    bcc @loop
+
+    plp
+    rts
+
+
+; Load parallax palette to CGRAM (BG colors 0-15)
+load_parallax_palette:
+    php
+    sep #$20
+    .a8
+
+    stz $2121               ; CGRAM address = 0
+
+    ldx #0
+@loop:
+    lda parallax_palette,x
+    sta $2122
+    inx
+    cpx #(parallax_palette_end - parallax_palette)
+    bcc @loop
+
+    plp
+    rts
+
+
+; Load BG2 palette to CGRAM 32-35 (Mode 0 BG2 uses this range)
+load_bg2_palette:
+    php
+    sep #$20
+    .a8
+
+    lda #32                 ; BG2 palette starts at CGRAM 32
+    sta $2121
+
+    ; Load colors 4-7 from parallax_palette (the green hill colors)
+    ; Each color is 2 bytes, so offset 8 bytes into parallax_palette
+    ldx #0
+@loop:
+    lda parallax_palette+8,x   ; Start at color 4 (offset 8 bytes)
+    sta $2122
+    inx
+    cpx #8                     ; 4 colors × 2 bytes = 8 bytes
+    bcc @loop
+
+    plp
+    rts
+
+
+; Load player sprite palette to CGRAM (sprite palette 0, colors 128-143)
+load_player_palette:
+    php
+    sep #$20
+    .a8
+
+    lda #128                ; Sprite palettes start at CGRAM 128
+    sta $2121
+
+    ldx #0
+@loop:
+    lda player_palette,x
+    sta $2122
+    inx
+    cpx #(player_palette_end - player_palette)
+    bcc @loop
+
+    plp
     rts
 
 
