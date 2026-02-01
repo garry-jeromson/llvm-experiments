@@ -129,13 +129,14 @@ def colorize(text, color, bold=False):
     return f"{prefix}{color}{text}{Colors.RESET}"
 
 class TestResult:
-    def __init__(self, name, passed, expected, actual, cycles=0, error=None):
+    def __init__(self, name, passed, expected, actual, cycles=0, error=None, opt_level=None):
         self.name = name
         self.passed = passed
         self.expected = expected
         self.actual = actual
         self.cycles = cycles
         self.error = error
+        self.opt_level = opt_level
 
 def find_tools(build_dir):
     """Locate required tools."""
@@ -544,28 +545,28 @@ def create_test_binary(code_bytes, data_bytes=b'', rodata_bytes=b'', load_addr=0
 
     return bytes(rom)
 
-def run_test(test_file, tools, runner_bin, build_dir, verbose=False):
-    """Compile and run a single test."""
+def run_test(test_file, tools, runner_bin, build_dir, verbose=False, opt_level='O2'):
+    """Compile and run a single test at specified optimization level."""
     test_name = Path(test_file).stem
 
     metadata = parse_test_file(test_file)
 
     if not metadata['is_test']:
-        return TestResult(test_name, None, None, None, error="Not a test file")
+        return TestResult(test_name, None, None, None, error="Not a test file", opt_level=opt_level)
 
     if metadata['skip']:
         return TestResult(test_name, None, None, None,
-                         error=f"SKIPPED: {metadata['skip_reason']}")
+                         error=f"SKIPPED: {metadata['skip_reason']}", opt_level=opt_level)
 
     expected = metadata['expect']
     if expected is None:
-        return TestResult(test_name, None, None, None, error="No EXPECT directive")
+        return TestResult(test_name, None, None, None, error="No EXPECT directive", opt_level=opt_level)
 
     # Load runtime library and symbols
     try:
         runtime_binary, runtime_symbols = load_runtime(build_dir)
     except FileNotFoundError as e:
-        return TestResult(test_name, False, expected, None, error=str(e))
+        return TestResult(test_name, False, expected, None, error=str(e), opt_level=opt_level)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         try:
@@ -574,13 +575,13 @@ def run_test(test_file, tools, runner_bin, build_dir, verbose=False):
 
             # Compile C to object file
             result = subprocess.run(
-                [tools['clang'], '-target', 'w65816-unknown-none', '-O2',
+                [tools['clang'], '-target', 'w65816-unknown-none', f'-{opt_level}',
                  '-c', test_file, '-o', obj_file],
                 capture_output=True, text=True, timeout=30
             )
             if result.returncode != 0:
                 return TestResult(test_name, False, expected, None,
-                                error=f"clang failed: {result.stderr}")
+                                error=f"clang failed: {result.stderr}", opt_level=opt_level)
 
             # Read ELF object file
             with open(obj_file, 'rb') as f:
@@ -591,7 +592,7 @@ def run_test(test_file, tools, runner_bin, build_dir, verbose=False):
                 code_bytes = extract_text_section(elf_data)
             except ValueError as e:
                 return TestResult(test_name, False, expected, None,
-                                error=f"ELF extraction failed: {e}")
+                                error=f"ELF extraction failed: {e}", opt_level=opt_level)
 
             data_bytes = extract_data_section(elf_data)
             rodata_bytes = extract_rodata_section(elf_data)
@@ -618,26 +619,46 @@ def run_test(test_file, tools, runner_bin, build_dir, verbose=False):
             if 'PASS' in output:
                 match = re.search(r'\[(\d+) cycles\]', output)
                 cycles = int(match.group(1)) if match else 0
-                return TestResult(test_name, True, expected, expected, cycles)
+                return TestResult(test_name, True, expected, expected, cycles, opt_level=opt_level)
             elif 'FAIL' in output:
                 match = re.search(r'result=(-?\d+)', output)
                 actual = int(match.group(1)) if match else None
                 match = re.search(r'\[(\d+) cycles\]', output)
                 cycles = int(match.group(1)) if match else 0
-                return TestResult(test_name, False, expected, actual, cycles)
+                return TestResult(test_name, False, expected, actual, cycles, opt_level=opt_level)
             elif 'TIMEOUT' in output:
                 return TestResult(test_name, False, expected, None,
-                                error="Execution timeout")
+                                error="Execution timeout", opt_level=opt_level)
             else:
                 return TestResult(test_name, False, expected, None,
-                                error=f"Unknown result: {output[:200]}")
+                                error=f"Unknown result: {output[:200]}", opt_level=opt_level)
 
         except subprocess.TimeoutExpired:
             return TestResult(test_name, False, expected, None,
-                            error="Process timeout")
+                            error="Process timeout", opt_level=opt_level)
         except Exception as e:
             return TestResult(test_name, False, expected, None,
-                            error=str(e))
+                            error=str(e), opt_level=opt_level)
+
+def _print_result(result, show_opt_level=False):
+    """Print a single test result."""
+    if result.passed is None:
+        if result.error and result.error.startswith("SKIPPED"):
+            status = colorize("SKIP", Colors.YELLOW)
+        else:
+            status = colorize("----", Colors.BLUE)
+    elif result.passed:
+        status = colorize("PASS", Colors.GREEN)
+    else:
+        status = colorize("FAIL", Colors.RED)
+
+    name = result.name.ljust(30)
+    if result.passed:
+        print(f"  {status} {name} = {result.actual} [{result.cycles} cycles]")
+    elif result.error:
+        print(f"  {status} {name} {result.error}")
+    else:
+        print(f"  {status} {name} expected {result.expected}, got {result.actual}")
 
 def main():
     parser = argparse.ArgumentParser(description='W65816 C Integration Test Runner')
@@ -650,7 +671,16 @@ def main():
                        help='Parallel jobs (default: 1)')
     parser.add_argument('--list', action='store_true',
                        help='List tests without running')
+    parser.add_argument('-O', '--opt-levels', nargs='+', default=['O2'],
+                       choices=['O0', 'O1', 'O2', 'O3', 'Os', 'Oz'],
+                       help='Optimization levels to test (default: O2). Use "all" for O0,O1,O2,O3')
+    parser.add_argument('--all-opts', action='store_true',
+                       help='Test all optimization levels (O0, O1, O2, O3)')
     args = parser.parse_args()
+
+    # Handle --all-opts flag
+    if args.all_opts:
+        args.opt_levels = ['O0', 'O1', 'O2', 'O3']
 
     # Find the runner binary
     runner_bin = os.path.join(args.build_dir, 'bin', 'w65816-runner')
@@ -689,54 +719,98 @@ def main():
             print(f"  {tf}: {status} (expect: {expect})")
         return 0
 
-    # Run tests
-    print(f"Running {len(test_files)} C integration tests...\n")
+    # Run tests at each optimization level
+    opt_levels = args.opt_levels
+    total_tests = len(test_files) * len(opt_levels)
+    print(f"Running {len(test_files)} C integration tests at {len(opt_levels)} optimization level(s): {', '.join(opt_levels)}")
+    print(f"Total test runs: {total_tests}\n")
 
-    results = []
-    if args.jobs > 1:
-        with ThreadPoolExecutor(max_workers=args.jobs) as executor:
-            futures = {
-                executor.submit(run_test, str(tf), tools, runner_bin, args.build_dir, args.verbose): tf
-                for tf in test_files
-            }
-            for future in as_completed(futures):
-                results.append(future.result())
-    else:
-        for tf in test_files:
-            result = run_test(str(tf), tools, runner_bin, args.build_dir, args.verbose)
-            results.append(result)
+    all_results = []  # (opt_level, results_list)
 
-            # Print result immediately
-            if result.passed is None:
-                if result.error and result.error.startswith("SKIPPED"):
-                    status = colorize("SKIP", Colors.YELLOW)
+    for opt_level in opt_levels:
+        if len(opt_levels) > 1:
+            print(f"\n{'='*60}")
+            print(f"  Optimization level: -{opt_level}")
+            print(f"{'='*60}\n")
+
+        results = []
+        if args.jobs > 1:
+            with ThreadPoolExecutor(max_workers=args.jobs) as executor:
+                futures = {
+                    executor.submit(run_test, str(tf), tools, runner_bin, args.build_dir, args.verbose, opt_level): tf
+                    for tf in test_files
+                }
+                for future in as_completed(futures):
+                    results.append(future.result())
+            # Sort by name for consistent output
+            results.sort(key=lambda r: r.name)
+            for result in results:
+                _print_result(result, len(opt_levels) > 1)
+        else:
+            for tf in test_files:
+                result = run_test(str(tf), tools, runner_bin, args.build_dir, args.verbose, opt_level)
+                results.append(result)
+                _print_result(result, len(opt_levels) > 1)
+
+        all_results.append((opt_level, results))
+
+        # Print per-level summary
+        passed = sum(1 for r in results if r.passed is True)
+        failed = sum(1 for r in results if r.passed is False)
+        skipped = sum(1 for r in results if r.passed is None)
+        print()
+        summary = f"-{opt_level}: {passed} passed, {failed} failed, {skipped} skipped"
+        if failed > 0:
+            print(colorize(summary, Colors.RED))
+        else:
+            print(colorize(summary, Colors.GREEN))
+
+    # Overall summary
+    print()
+    print("=" * 60)
+    print("SUMMARY BY OPTIMIZATION LEVEL")
+    print("=" * 60)
+
+    total_passed = 0
+    total_failed = 0
+    total_skipped = 0
+    failures_by_level = {}
+
+    for opt_level, results in all_results:
+        passed = sum(1 for r in results if r.passed is True)
+        failed = sum(1 for r in results if r.passed is False)
+        skipped = sum(1 for r in results if r.passed is None)
+        total_passed += passed
+        total_failed += failed
+        total_skipped += skipped
+
+        # Track failures
+        failures = [r for r in results if r.passed is False]
+        if failures:
+            failures_by_level[opt_level] = failures
+
+        status = colorize("PASS", Colors.GREEN) if failed == 0 else colorize("FAIL", Colors.RED)
+        print(f"  {status} -{opt_level}: {passed}/{len(results)} passed")
+
+    # Show failures grouped by opt level
+    if failures_by_level:
+        print()
+        print("FAILURES:")
+        for opt_level, failures in failures_by_level.items():
+            print(f"\n  -{opt_level}:")
+            for r in failures:
+                if r.error:
+                    print(f"    {r.name}: {r.error[:60]}")
                 else:
-                    status = colorize("----", Colors.BLUE)
-            elif result.passed:
-                status = colorize("PASS", Colors.GREEN)
-            else:
-                status = colorize("FAIL", Colors.RED)
-
-            name = result.name.ljust(30)
-            if result.passed:
-                print(f"  {status} {name} = {result.actual} [{result.cycles} cycles]")
-            elif result.error:
-                print(f"  {status} {name} {result.error}")
-            else:
-                print(f"  {status} {name} expected {result.expected}, got {result.actual}")
-
-    # Summary
-    passed = sum(1 for r in results if r.passed is True)
-    failed = sum(1 for r in results if r.passed is False)
-    skipped = sum(1 for r in results if r.passed is None)
+                    print(f"    {r.name}: expected {r.expected}, got {r.actual}")
 
     print()
     print("=" * 60)
-    summary = f"Results: {passed} passed, {failed} failed, {skipped} skipped"
-    if failed > 0:
-        print(colorize(summary, Colors.RED, bold=True))
+    grand_total = f"Total: {total_passed} passed, {total_failed} failed, {total_skipped} skipped"
+    if total_failed > 0:
+        print(colorize(grand_total, Colors.RED, bold=True))
     else:
-        print(colorize(summary, Colors.GREEN, bold=True))
+        print(colorize(grand_total, Colors.GREEN, bold=True))
 
     return 0 if failed == 0 else 1
 

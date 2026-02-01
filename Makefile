@@ -720,8 +720,12 @@ build-c-runtime: deps-runtime
 	@echo "$(GREEN)W65816 runtime built: $(C_RUNTIME_BUILD_DIR)/w65816_runtime.bin$(NC)"
 
 test-c-integration: build-test-runner build-c-runtime
-	@echo "$(BLUE)Running W65816 C integration tests...$(NC)"
-	@python3 test/c-integration/run_tests.py -b $(BUILD_DIR)
+	@echo "$(BLUE)Running W65816 C integration tests at all optimization levels...$(NC)"
+	@python3 test/c-integration/run_tests.py -b $(BUILD_DIR) --all-opts
+
+test-c-integration-O2: build-test-runner build-c-runtime
+	@echo "$(BLUE)Running W65816 C integration tests at -O2 only...$(NC)"
+	@python3 test/c-integration/run_tests.py -b $(BUILD_DIR) -O O2
 
 test-c-integration-verbose: build-test-runner build-c-runtime
-	@python3 test/c-integration/run_tests.py -b $(BUILD_DIR) -v
+	@python3 test/c-integration/run_tests.py -b $(BUILD_DIR) --all-opts -v
