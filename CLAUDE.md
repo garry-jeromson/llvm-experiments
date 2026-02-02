@@ -303,7 +303,9 @@ The runtime is automatically built and linked by `make test-c-integration`.
   For rotate-through-carry operations, use inline assembly.
 
 **Not Implemented:**
-- 32-bit integer operations (i32 requires manual 16-bit pair handling)
+- 32-bit integer operations are **prohibited with clear error messages** at compile time.
+  Using i32 or i64 types in function arguments or return values will produce:
+  `error: 32-bit and 64-bit integer arguments/return values are not supported on W65816. Use 16-bit types (short, int16_t) instead.`
 - Runtime 8/16-bit mode switching (compile-time flags only)
 
 ---

@@ -161,6 +161,7 @@ def parse_test_file(path):
         'expect': None,
         'skip': False,
         'skip_reason': None,
+        'expect_error': None,  # Expected compilation error pattern
     }
 
     if '// INTEGRATION-TEST' in content:
@@ -171,6 +172,11 @@ def parse_test_file(path):
     if match:
         val = match.group(1)
         metadata['expect'] = int(val, 0)
+
+    # Look for expected compilation error (for error tests)
+    match = re.search(r'// EXPECT-ERROR:\s*(.+)', content)
+    if match:
+        metadata['expect_error'] = match.group(1).strip()
 
     # Check for skip directive
     match = re.search(r'// SKIP:\s*(.*)', content)
@@ -577,6 +583,43 @@ def create_test_binary(code_bytes, data_bytes=b'', rodata_bytes=b'', load_addr=0
 
     return bytes(rom)
 
+def run_error_test(test_file, test_name, expect_error, tools, opt_level='O2'):
+    """Run a test that expects compilation to fail with a specific error message."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        try:
+            obj_file = os.path.join(tmpdir, f"{test_name}.o")
+
+            # Try to compile C to object file
+            result = subprocess.run(
+                [tools['clang'], '-target', 'w65816-unknown-none', f'-{opt_level}',
+                 '-c', test_file, '-o', obj_file],
+                capture_output=True, text=True, timeout=30
+            )
+
+            # Combine stdout and stderr for error checking
+            output = result.stdout + result.stderr
+
+            if result.returncode == 0:
+                # Compilation succeeded when it should have failed
+                return TestResult(test_name, False, f"error: {expect_error}", "compilation succeeded",
+                                error="Expected compilation to fail", opt_level=opt_level)
+
+            # Compilation failed - check if the error message matches
+            if expect_error in output:
+                return TestResult(test_name, True, f"error: {expect_error}",
+                                f"error: {expect_error}", cycles=0, opt_level=opt_level)
+            else:
+                # Wrong error message
+                return TestResult(test_name, False, f"error: {expect_error}", output[:200],
+                                error=f"Wrong error message", opt_level=opt_level)
+
+        except subprocess.TimeoutExpired:
+            return TestResult(test_name, False, f"error: {expect_error}", None,
+                            error="Process timeout", opt_level=opt_level)
+        except Exception as e:
+            return TestResult(test_name, False, f"error: {expect_error}", None,
+                            error=str(e), opt_level=opt_level)
+
 def run_test(test_file, tools, runner_bin, build_dir, verbose=False, opt_level='O2'):
     """Compile and run a single test at specified optimization level."""
     test_name = Path(test_file).stem
@@ -589,6 +632,11 @@ def run_test(test_file, tools, runner_bin, build_dir, verbose=False, opt_level='
     if metadata['skip']:
         return TestResult(test_name, None, None, None,
                          error=f"SKIPPED: {metadata['skip_reason']}", opt_level=opt_level)
+
+    # Handle error tests (tests that expect compilation to fail)
+    expect_error = metadata.get('expect_error')
+    if expect_error:
+        return run_error_test(test_file, test_name, expect_error, tools, opt_level)
 
     expected = metadata['expect']
     if expected is None:
