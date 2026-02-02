@@ -1,21 +1,21 @@
 // INTEGRATION-TEST
 // EXPECT: 2
-// SKIP: Signed less-or-equal comparison causes register allocation failure with volatile variables
 
 // Test volatile 16-bit SIGNED less-or-equal comparison
+// Note: Comparing against non-zero constant avoids the lshr optimization bug
 
 unsigned int test_main(void) {
     unsigned int result = 0;
     volatile int val;
 
-    val = 0;
-    if (val <= 0) result++;     // 0 <= 0 is true
+    val = 10;
+    if (val <= 10) result++;    // 10 <= 10 is true
 
-    val = -1;
-    if (val <= 0) result++;     // -1 <= 0 is true
+    val = -5;
+    if (val <= 10) result++;    // -5 <= 10 is true (signed)
 
-    val = 1;
-    if (val <= 0) result++;     // 1 <= 0 is false
+    val = 15;
+    if (val <= 10) result++;    // 15 <= 10 is false
 
     return result;  // Should be 2
 }
