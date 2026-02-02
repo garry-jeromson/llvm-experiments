@@ -1,7 +1,7 @@
 """Tests for GSU memory map utilities."""
 
 import pytest
-from tools.superfx.memory_map import (
+from tools.snes_builder.superfx.memory_map import (
     # Address translation
     snes_to_gsu_rom,
     snes_to_gsu_ram,

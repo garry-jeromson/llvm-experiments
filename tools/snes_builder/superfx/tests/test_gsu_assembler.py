@@ -1,7 +1,7 @@
 """Tests for GSU assembler."""
 
 import pytest
-from tools.superfx.gsu_assembler import GSUAssembler, AssemblyError
+from tools.snes_builder.superfx.gsu_assembler import GSUAssembler, AssemblyError
 
 
 class TestSingleInstructionAssembly:

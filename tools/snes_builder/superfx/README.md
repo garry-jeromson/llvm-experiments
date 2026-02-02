@@ -18,7 +18,7 @@ The toolkit is part of the llvm-experiments project. No additional dependencies 
 ## Quick Start
 
 ```python
-from tools.superfx import GSUAssembler, SuperFXROMBuilder
+from tools.snes_builder.superfx import GSUAssembler, SuperFXROMBuilder
 
 # Assemble a simple GSU program
 asm = GSUAssembler()
@@ -142,7 +142,7 @@ loop:
 ## Register Constants
 
 ```python
-from tools.superfx.gsu_registers import (
+from tools.snes_builder.superfx.gsu_registers import (
     R0, R1, R2, R3, R4, R5, R6, R7,
     R8, R9, R10, R11, R12, R13, R14, R15,
     SFR, SCMR, SCBR, PBR,
@@ -153,7 +153,7 @@ from tools.superfx.gsu_registers import (
 ## Programmatic Assembly
 
 ```python
-from tools.superfx import IBT, COLOR, PLOT, STOP, NOP
+from tools.snes_builder.superfx import IBT, COLOR, PLOT, STOP, NOP
 
 # Build instructions programmatically
 instructions = [
@@ -170,7 +170,7 @@ code = b''.join(instr.encode() for instr in instructions)
 ## Memory Map Utilities
 
 ```python
-from tools.superfx.memory_map import (
+from tools.snes_builder.superfx.memory_map import (
     get_screen_buffer_size,
     snes_to_gsu_rom,
     gsu_to_snes_ram,

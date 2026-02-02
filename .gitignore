@@ -36,3 +36,8 @@ __pycache__/
 # Backup files
 *.bak
 *.orig
+
+# Copyrighted ROMs and books
+*.zip
+docs/snes-programming-book*.pdf
+docs/snes-programming-book*.txt

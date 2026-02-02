@@ -6,12 +6,25 @@ with embedded GSU programs.
 
 from typing import Optional
 
-from tools.superfx.gsu_registers import (
+from tools.snes_builder.superfx.gsu_registers import (
     SFR, PBR, SCBR, SCMR,
     SCMR_HT_128, SCMR_HT_160, SCMR_HT_192,
     SCMR_MD_4COLOR, SCMR_MD_16COLOR, SCMR_MD_256COLOR,
     SCMR_RON, SCMR_RAN,
     R15,
+)
+from tools.snes_builder.rom_utils import (
+    CartType,
+    MapMode,
+    ROMSize,
+    RAMSize,
+    calculate_checksum,
+    calculate_checksum_complement,
+    create_header,
+    write_checksum,
+    HIROM_HEADER_OFFSET,
+    MIN_SUPERFX_ROM_SIZE,
+    HEADER_RESET_VECTOR_OFFSET,
 )
 
 
@@ -24,26 +37,6 @@ class SuperFXROMBuilder:
     - Embedded GSU program at specified address
     - Correct checksums
     """
-
-    # ROM constants
-    MIN_ROM_SIZE = 256 * 1024  # 256KB minimum for SuperFX
-    HEADER_OFFSET = 0xFFC0    # SNES header location
-
-    # Header offsets (relative to $FFC0)
-    TITLE_OFFSET = 0x00       # $FFC0-$FFD4: 21-byte title
-    MAP_MODE_OFFSET = 0x15    # $FFD5: Map mode
-    TYPE_OFFSET = 0x16        # $FFD6: Cartridge type
-    ROM_SIZE_OFFSET = 0x17    # $FFD7: ROM size
-    RAM_SIZE_OFFSET = 0x18    # $FFD8: RAM size
-    CHECKSUM_COMPLEMENT_OFFSET = 0x1C  # $FFDC-$FFDD
-    CHECKSUM_OFFSET = 0x1E    # $FFDE-$FFDF
-    RESET_VECTOR_OFFSET = 0x3C  # $FFFC-$FFFD
-
-    # Header values
-    MAP_MODE_LOROM = 0x20
-    CART_TYPE_SUPERFX = 0x13
-    ROM_SIZE_256KB = 0x08
-    RAM_SIZE_64KB = 0x05
 
     # Valid screen configurations
     VALID_HEIGHTS = {128, 160, 192}
@@ -95,7 +88,7 @@ class SuperFXROMBuilder:
             Complete ROM image as bytes
         """
         # Start with $FF-filled ROM
-        rom = bytearray([0xFF] * self.MIN_ROM_SIZE)
+        rom = bytearray([0xFF] * MIN_SUPERFX_ROM_SIZE)
 
         # Embed GSU code
         self._embed_gsu_code(rom)
@@ -103,11 +96,21 @@ class SuperFXROMBuilder:
         # Create and embed SNES startup code
         startup_addr = self._embed_startup_code(rom)
 
-        # Write header
-        self._write_header(rom, startup_addr)
+        # Write header using shared utilities
+        header = create_header(
+            title=self.title,
+            map_mode=MapMode.LOROM,
+            cart_type=CartType.SUPERFX,
+            rom_size=ROMSize.SIZE_256KB,
+            ram_size=RAMSize.SIZE_64KB,
+            reset_vector=startup_addr,
+        )
+        # Write header at HiROM location (file offset $FFC0 for 256KB+ ROMs)
+        for i, byte in enumerate(header):
+            rom[HIROM_HEADER_OFFSET + i] = byte
 
-        # Calculate and write checksums
-        self._write_checksums(rom)
+        # Calculate and write checksums using shared utility
+        write_checksum(rom, HIROM_HEADER_OFFSET)
 
         return bytes(rom)
 
@@ -239,53 +242,3 @@ class SuperFXROMBuilder:
             scmr |= SCMR_MD_256COLOR
 
         return scmr
-
-    def _write_header(self, rom: bytearray, reset_addr: int) -> None:
-        """Write SNES header to ROM."""
-        base = self.HEADER_OFFSET
-
-        # Title (21 bytes, padded with spaces)
-        title_bytes = self.title.encode('ascii')
-        title_padded = title_bytes.ljust(21, b' ')
-        for i, byte in enumerate(title_padded[:21]):
-            rom[base + self.TITLE_OFFSET + i] = byte
-
-        # Map mode
-        rom[base + self.MAP_MODE_OFFSET] = self.MAP_MODE_LOROM
-
-        # Cartridge type
-        rom[base + self.TYPE_OFFSET] = self.CART_TYPE_SUPERFX
-
-        # ROM size
-        rom[base + self.ROM_SIZE_OFFSET] = self.ROM_SIZE_256KB
-
-        # RAM size
-        rom[base + self.RAM_SIZE_OFFSET] = self.RAM_SIZE_64KB
-
-        # Reset vector (little-endian)
-        rom[base + self.RESET_VECTOR_OFFSET] = reset_addr & 0xFF
-        rom[base + self.RESET_VECTOR_OFFSET + 1] = (reset_addr >> 8) & 0xFF
-
-    def _write_checksums(self, rom: bytearray) -> None:
-        """Calculate and write ROM checksums."""
-        base = self.HEADER_OFFSET
-
-        # Clear checksum bytes first
-        rom[base + self.CHECKSUM_COMPLEMENT_OFFSET] = 0
-        rom[base + self.CHECKSUM_COMPLEMENT_OFFSET + 1] = 0
-        rom[base + self.CHECKSUM_OFFSET] = 0
-        rom[base + self.CHECKSUM_OFFSET + 1] = 0
-
-        # Calculate checksum (sum of all bytes mod 65536)
-        checksum = sum(rom) & 0xFFFF
-
-        # Complement is XOR with $FFFF
-        complement = checksum ^ 0xFFFF
-
-        # Write complement (little-endian)
-        rom[base + self.CHECKSUM_COMPLEMENT_OFFSET] = complement & 0xFF
-        rom[base + self.CHECKSUM_COMPLEMENT_OFFSET + 1] = (complement >> 8) & 0xFF
-
-        # Write checksum (little-endian)
-        rom[base + self.CHECKSUM_OFFSET] = checksum & 0xFF
-        rom[base + self.CHECKSUM_OFFSET + 1] = (checksum >> 8) & 0xFF

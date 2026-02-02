@@ -110,6 +110,15 @@ help:
 	@echo "  make run-snes-demo      - Build and run C demo in SNES emulator"
 	@echo "  make run-snes-test      - Build and run test ROM in SNES emulator"
 	@echo ""
+	@echo "$(GREEN)SNES SDK Examples:$(NC)"
+	@echo "  make build-snes-tech-demo    - Build SDK tech demo"
+	@echo "  make build-snes-audio-demo   - Build SDK audio demo"
+	@echo "  make build-snes-superfx-demo - Build SDK SuperFX demo"
+	@echo "  make run-snes-tech-demo      - Build and run tech demo"
+	@echo "  make run-snes-audio-demo     - Build and run audio demo"
+	@echo "  make run-snes-superfx-demo   - Build and run SuperFX demo"
+	@echo "  make build-snes-sdk-examples - Build all SDK examples"
+	@echo ""
 	@echo "$(GREEN)Configuration Variables:$(NC)"
 	@echo "  BACKEND_NAME=$(BACKEND_NAME)"
 	@echo "  LLVM_VERSION=$(LLVM_VERSION)"
@@ -729,3 +738,40 @@ test-c-integration-O2: build-test-runner build-c-runtime
 
 test-c-integration-verbose: build-test-runner build-c-runtime
 	@python3 test/c-integration/run_tests.py -b $(BUILD_DIR) --all-opts -v
+
+# =============================================================================
+# SNES SDK Examples
+# =============================================================================
+
+SNES_SDK_DIR := $(ROOT_DIR)/snes-sdk
+SDK_EXAMPLES_DIR := $(SNES_SDK_DIR)/examples
+
+build-snes-tech-demo: deps-runtime
+	@echo "$(BLUE)Building SNES tech demo ROM...$(NC)"
+	@mkdir -p $(SNES_BUILD_DIR)
+	@python3 $(SNES_BUILDER)/build_rom.py $(SDK_EXAMPLES_DIR)/tech_demo/main.cpp $(SNES_BUILD_DIR)/tech_demo.sfc
+	@echo "$(GREEN)SNES tech demo ROM built: $(SNES_BUILD_DIR)/tech_demo.sfc$(NC)"
+
+run-snes-tech-demo: build-snes-tech-demo
+	@python3 $(SNES_BUILDER)/run_rom.py $(SNES_BUILD_DIR)/tech_demo.sfc
+
+build-snes-audio-demo: deps-runtime
+	@echo "$(BLUE)Building SNES audio demo ROM...$(NC)"
+	@mkdir -p $(SNES_BUILD_DIR)
+	@python3 $(SNES_BUILDER)/build_rom.py $(SDK_EXAMPLES_DIR)/audio_demo/main.cpp $(SNES_BUILD_DIR)/audio_demo.sfc
+	@echo "$(GREEN)SNES audio demo ROM built: $(SNES_BUILD_DIR)/audio_demo.sfc$(NC)"
+
+run-snes-audio-demo: build-snes-audio-demo
+	@python3 $(SNES_BUILDER)/run_rom.py $(SNES_BUILD_DIR)/audio_demo.sfc
+
+build-snes-superfx-demo: deps-runtime
+	@echo "$(BLUE)Building SNES SuperFX demo ROM...$(NC)"
+	@mkdir -p $(SNES_BUILD_DIR)
+	@python3 $(SNES_BUILDER)/build_rom.py $(SDK_EXAMPLES_DIR)/superfx_demo/main.cpp $(SNES_BUILD_DIR)/superfx_demo.sfc
+	@echo "$(GREEN)SNES SuperFX demo ROM built: $(SNES_BUILD_DIR)/superfx_demo.sfc$(NC)"
+
+run-snes-superfx-demo: build-snes-superfx-demo
+	@python3 $(SNES_BUILDER)/run_rom.py $(SNES_BUILD_DIR)/superfx_demo.sfc
+
+build-snes-sdk-examples: build-snes-tech-demo build-snes-audio-demo build-snes-superfx-demo
+	@echo "$(GREEN)All SDK examples built!$(NC)"

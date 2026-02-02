@@ -1,7 +1,7 @@
 """Tests for SuperFX ROM builder."""
 
 import pytest
-from tools.superfx.rom_builder import SuperFXROMBuilder
+from tools.snes_builder.superfx.rom_builder import SuperFXROMBuilder
 
 
 class TestROMHeader:
@@ -32,8 +32,8 @@ class TestROMHeader:
         """Header has correct RAM size value."""
         builder = SuperFXROMBuilder(bytes([0x00, 0x01]))
         rom = builder.build()
-        # RAM size at $FFD8: $05 = 64KB
-        assert rom[0xFFD8] == 0x05
+        # RAM size at $FFD8: $06 = 64KB (for SuperFX backup RAM)
+        assert rom[0xFFD8] == 0x06
 
     def test_header_title(self):
         """Header can have custom title."""

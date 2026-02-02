@@ -3,24 +3,57 @@
 ## Completed
 - [x] Port stdlib functions (strlen, strcpy, strcmp, strncpy, strncmp, strcat, strchr)
 - [x] String display driver (text.hpp, font_2bpp.s)
+- [x] Sound driver API (audio.hpp, audio.cpp)
+  - C++ API for SPC700 communication
+  - Sound effect and music playback interface
+  - Volume control
+  - Demo application (audio_demo)
+  - Note: Requires SPC700 binary for actual sound output
+- [x] SuperFX driver API (superfx.hpp, superfx.cpp)
+  - C++ API for GSU-1/GSU-2 coprocessor
+  - Execution control, screen configuration
+  - Memory access, high-speed mode support
+  - Demo application (superfx_demo)
+  - Note: Requires SuperFX programs for actual 3D rendering
 
 ## Remaining
-- [ ] Sound driver - Requires SPC700 assembly and APU communication protocol
-- [ ] SuperFX driver - Requires SuperFX assembly and coprocessor interface
+- [ ] Sound driver SPC700 binary - Need SPC700 assembler to compile the driver code
+- [ ] SuperFX driver programs - Need actual SuperFX assembly programs to run
 - [ ] Review SDK code for quality: readability, clear variable names, functions with purpose, no magic numbers, etc.
 
 ## Notes
 
 ### Sound Driver
-The SNES uses a separate Sony SPC700 processor for audio. A sound driver requires:
-1. SPC700 assembly code (uploaded via APUIO0-3 ports at $2140-$2143)
-2. Boot/IPL code to initialize the APU
-3. Music data format (SPC, IT, XM, or custom)
-4. Communication protocol between 65816 and SPC700
+The SNES uses a separate Sony SPC700 processor for audio.
+
+**What's implemented:**
+- `snes-sdk/include/snes/audio.hpp` - API header with SFX/music functions
+- `snes-sdk/src/audio.cpp` - 65816-side driver implementation
+- `snes-sdk/data/spc700_driver.s` - SPC700 driver source (needs SPC700 assembler)
+- `snes-sdk/examples/audio_demo/` - Demo application
+
+**To complete:**
+- Compile SPC700 driver with an SPC700 assembler (not ca65, which is 65816-only)
+- Options: bass assembler, WLA-DX, or a custom tool
+- The SPC700 code provides tone generation and responds to commands from the 65816
 
 ### SuperFX Driver
-The SuperFX is a RISC coprocessor used in cartridges like Star Fox. Requires:
-1. SuperFX assembly code
-2. Memory mapping configuration
-3. Frame buffer management
-4. Communication with the main CPU
+The SuperFX (GSU-1/GSU-2) is a RISC coprocessor used in cartridges like Star Fox.
+
+**What's implemented:**
+- `snes-sdk/include/snes/superfx.hpp` - API header with execution control
+- `snes-sdk/src/superfx.cpp` - 65816-side driver implementation
+- `snes-sdk/examples/superfx_demo/` - Demo application
+
+**API features:**
+- Detection and version identification (GSU-1 vs GSU-2)
+- Execution control (start, stop, wait)
+- Screen configuration (resolution, color depth)
+- Memory access (read/write RAM)
+- High-speed mode (21.4 MHz for GSU-2)
+- IRQ handling
+
+**To complete:**
+- Compile actual SuperFX programs (RISC assembly)
+- Options: bass assembler with SuperFX support, or custom tool
+- The SuperFX code runs on a separate RISC processor with its own instruction set

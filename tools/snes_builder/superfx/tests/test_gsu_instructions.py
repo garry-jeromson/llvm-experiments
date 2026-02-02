@@ -1,7 +1,7 @@
 """Tests for GSU instruction encoding."""
 
 import pytest
-from tools.superfx.gsu_instructions import (
+from tools.snes_builder.superfx.gsu_instructions import (
     # Control instructions
     STOP, NOP, CACHE, LOOP,
     # Shift instructions

@@ -4,7 +4,7 @@ This package provides tools for building SuperFX ROMs and assembling GSU program
 
 Example usage:
 
-    from tools.superfx import GSUAssembler, SuperFXROMBuilder
+    from tools.snes_builder.superfx import GSUAssembler, SuperFXROMBuilder
 
     # Assemble a simple GSU program
     asm = GSUAssembler()
@@ -30,13 +30,13 @@ Example usage:
 """
 
 # Assembler
-from tools.superfx.gsu_assembler import GSUAssembler, AssemblyError
+from tools.snes_builder.superfx.gsu_assembler import GSUAssembler, AssemblyError
 
 # ROM Builder
-from tools.superfx.rom_builder import SuperFXROMBuilder
+from tools.snes_builder.superfx.rom_builder import SuperFXROMBuilder
 
 # Instruction classes (for programmatic assembly)
-from tools.superfx.gsu_instructions import (
+from tools.snes_builder.superfx.gsu_instructions import (
     # Control
     STOP, NOP, CACHE, LOOP,
     # Shifts
@@ -66,7 +66,7 @@ from tools.superfx.gsu_instructions import (
 )
 
 # Register constants
-from tools.superfx.gsu_registers import (
+from tools.snes_builder.superfx.gsu_registers import (
     # General registers
     R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15,
     # Control registers
@@ -81,7 +81,7 @@ from tools.superfx.gsu_registers import (
 )
 
 # Memory map utilities
-from tools.superfx.memory_map import (
+from tools.snes_builder.superfx.memory_map import (
     snes_to_gsu_rom,
     snes_to_gsu_ram,
     gsu_to_snes_rom,
