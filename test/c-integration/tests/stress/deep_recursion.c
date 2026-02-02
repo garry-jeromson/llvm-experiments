@@ -1,6 +1,6 @@
 // INTEGRATION-TEST
 // EXPECT: 5
-// SKIP: Recursive fibonacci times out even for small n due to O(2^n) complexity
+// SKIP: At -O2, compiler uses fixed DP locations for locals that get clobbered by recursive calls. At -O1, tail call optimization avoids this but fibonacci is not tail-recursive.
 
 // Recursive fibonacci (tests stack frames and recursion)
 int fib(int n) {
