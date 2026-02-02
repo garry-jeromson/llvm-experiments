@@ -7,6 +7,12 @@ INCLUDE_DIR := $(SDK_ROOT)include
 SRC_DIR := $(SDK_ROOT)src
 TEST_DIR := $(SDK_ROOT)test
 BUILD_DIR := $(SDK_ROOT)build
+VENV_DIR := $(SDK_ROOT).venv
+
+# Python virtual environment
+PYTHON := python3
+VENV_PYTHON := $(VENV_DIR)/bin/python
+VENV_PIP := $(VENV_DIR)/bin/pip
 
 # Host compiler (for unit tests)
 HOST_CXX := clang++
@@ -21,7 +27,7 @@ W65816_CXXFLAGS := -target w65816-unknown-none -O2 -fno-exceptions -fno-rtti -I$
 AS := ca65
 ASFLAGS := --cpu 65816
 LD := ld65
-LDFLAGS := -C $(SDK_ROOT)lorom.cfg
+LDFLAGS := -C $(SDK_ROOT)linker_configs/lorom.cfg
 
 # Source files
 SDK_SOURCES := $(wildcard $(SRC_DIR)/*.cpp)
@@ -31,7 +37,7 @@ TEST_SOURCES := $(wildcard $(TEST_DIR)/unit/test_*.cpp)
 SDK_HOST_OBJS := $(patsubst $(SRC_DIR)/%.cpp,$(BUILD_DIR)/host/%.o,$(SDK_SOURCES))
 SDK_W65816_OBJS := $(patsubst $(SRC_DIR)/%.cpp,$(BUILD_DIR)/w65816/%.o,$(SDK_SOURCES))
 
-.PHONY: all clean test-unit test-sdk-integration test-sdk host-build w65816-build
+.PHONY: all clean test-unit test-sdk-integration test-sdk host-build w65816-build venv
 
 # Default target
 all: host-build
@@ -39,6 +45,19 @@ all: host-build
 # Create build directories
 $(BUILD_DIR)/host $(BUILD_DIR)/w65816:
 	mkdir -p $@
+
+# ============================================================================
+# Python Virtual Environment
+# ============================================================================
+
+$(VENV_DIR):
+	$(PYTHON) -m venv $(VENV_DIR)
+	$(VENV_PIP) install --upgrade pip
+	$(VENV_PIP) install -r $(SDK_ROOT)requirements.txt
+
+venv: $(VENV_DIR)
+	@echo "Virtual environment ready at $(VENV_DIR)"
+	@echo "Activate with: source $(VENV_DIR)/bin/activate"
 
 # ============================================================================
 # Host Build (for unit tests)
@@ -102,6 +121,7 @@ clean:
 help:
 	@echo "SNES SDK Build Targets:"
 	@echo ""
+	@echo "  make venv                - Create Python virtual environment"
 	@echo "  make test-unit           - Run host-side unit tests"
 	@echo "  make test-sdk-integration - Run emulator integration tests"
 	@echo "  make test-sdk            - Run all SDK tests"
@@ -112,3 +132,8 @@ help:
 	@echo ""
 	@echo "Variables:"
 	@echo "  LLVM_BUILD=path          - Path to LLVM build directory (default: ../build)"
+	@echo ""
+	@echo "ROM Builder (snes-sdk/rom_builder/):"
+	@echo "  python rom_builder/build_rom.py main.cpp output.sfc"
+	@echo "  python rom_builder/fix_checksum.py rom.sfc"
+	@echo "  python rom_builder/run_rom.py rom.sfc"

@@ -6,14 +6,14 @@ with embedded GSU programs.
 
 from typing import Optional
 
-from tools.snes_builder.superfx.gsu_registers import (
+from .gsu_registers import (
     SFR, PBR, SCBR, SCMR,
     SCMR_HT_128, SCMR_HT_160, SCMR_HT_192,
     SCMR_MD_4COLOR, SCMR_MD_16COLOR, SCMR_MD_256COLOR,
     SCMR_RON, SCMR_RAN,
     R15,
 )
-from tools.snes_builder.rom_utils import (
+from ..rom_utils import (
     CartType,
     MapMode,
     ROMSize,

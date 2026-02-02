@@ -1,6 +1,14 @@
-# SNES SDK TODO
+# W65816 LLVM Backend TODO
 
-## Completed
+## Recently Completed
+
+### Backend Development
+- [x] Coding standards audit - clang-format, error message conventions, static_cast
+- [x] MC layer tests - 10 assembler tests for instruction encoding
+- [x] Documentation - README.md, W65816Usage.rst, added to LLVM docs index
+- [x] Pre-commit hook - Auto-format W65816 files on commit
+
+### SNES SDK
 - [x] Port stdlib functions (strlen, strcpy, strcmp, strncpy, strncmp, strcat, strchr)
 - [x] String display driver (text.hpp, font_2bpp.s)
 - [x] Sound driver API (audio.hpp, audio.cpp)
@@ -15,17 +23,53 @@
   - Memory access, high-speed mode support
   - Demo application (superfx_demo)
   - Note: Requires SuperFX programs for actual 3D rendering
-
-## Remaining
-- [ ] Sound driver SPC700 binary - Need SPC700 assembler to compile the driver code
-- [ ] SuperFX driver programs - Need actual SuperFX assembly programs to run
-
-## Recently Completed
 - [x] SDK code quality review - Added named constants to replace magic numbers:
   - text.hpp/cpp: `SCREEN_COLS`, `SCREEN_ROWS`, `TAB_ALIGN_MASK`
   - ppu.hpp: `BRIGHTNESS_MASK`
   - audio.hpp: Added explanatory comments for counter wrapping logic
   - superfx.hpp: `HEIGHT_128/160/192`, `DEPTH_2BPP/4BPP/8BPP`
+
+---
+
+## LLVM Upstream Submission
+
+Preparing the backend for inclusion in the official LLVM project.
+
+- [ ] Draft RFC for LLVM Discourse
+- [ ] Set up buildbot infrastructure
+- [ ] Organize patches for incremental review (~9 patches)
+- [ ] Add Maintainers.md entry
+
+---
+
+## SNES SDK
+
+### High Priority
+- [ ] Sound driver SPC700 binary - Need SPC700 assembler to compile the driver code
+- [ ] SuperFX driver programs - Need actual SuperFX assembly programs to run
+
+### Infrastructure
+- [x] Linker scripts (`snes-sdk/linker_configs/`)
+  - `lorom.cfg` - Standard LoROM (32KB single bank)
+  - `hirom.cfg` - Standard HiROM (64KB)
+  - `lorom-multibank.cfg` - Multi-bank LoROM (256KB, extendable)
+- [x] ROM builder tooling (`snes-sdk/rom_builder/`)
+  - `build_rom.py` supports lorom, hirom, multibank, superfx cart types
+  - `fix_checksum.py` auto-detects LoROM/HiROM layout
+  - `run_rom.py` launches ROMs in emulator
+  - `requirements.txt` for Python dependencies
+  - Makefile includes venv setup (`make venv`)
+- [ ] Standard library stubs (minimal libc)
+
+---
+
+## Backend Polish (Lower Priority)
+
+- [ ] Extend assembler addressing mode support (indexed modes for ADC/SBC/etc)
+- [ ] Add disassembler tests
+- [ ] Debug info (DWARF) support for emulator debugging
+
+---
 
 ## Notes
 

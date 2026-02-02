@@ -84,7 +84,7 @@ MIN_ROM_SIZE = 32 * 1024          # 32KB minimum for any SNES ROM
 MIN_SUPERFX_ROM_SIZE = 256 * 1024  # 256KB minimum for SuperFX
 
 
-def calculate_checksum(data: bytes, zero_checksum_area: bool = True) -> int:
+def calculate_checksum(data: bytes, zero_checksum_area: bool = True, header_offset: int = None) -> int:
     """Calculate SNES ROM checksum.
 
     The checksum is the 16-bit sum of all ROM bytes.
@@ -93,20 +93,31 @@ def calculate_checksum(data: bytes, zero_checksum_area: bool = True) -> int:
         data: ROM data bytes
         zero_checksum_area: If True, treat the checksum bytes as zero
                            for calculation purposes
+        header_offset: Header offset to use (auto-detected if None)
 
     Returns:
         16-bit checksum value
     """
     data_list = list(data)
 
-    if zero_checksum_area and len(data) >= LOROM_HEADER_OFFSET + HEADER_CHECKSUM_OFFSET + 2:
-        # Zero out checksum area for calculation (LoROM location)
-        comp_off = LOROM_HEADER_OFFSET + HEADER_CHECKSUM_COMP_OFFSET
-        check_off = LOROM_HEADER_OFFSET + HEADER_CHECKSUM_OFFSET
-        data_list[comp_off] = 0
-        data_list[comp_off + 1] = 0
-        data_list[check_off] = 0
-        data_list[check_off + 1] = 0
+    if zero_checksum_area:
+        # Detect header offset if not provided
+        if header_offset is None:
+            header_offset = LOROM_HEADER_OFFSET
+            # Try to detect from map mode
+            if len(data) >= HIROM_HEADER_OFFSET + HEADER_MAP_MODE_OFFSET + 1:
+                map_mode = data[HIROM_HEADER_OFFSET + HEADER_MAP_MODE_OFFSET]
+                if map_mode in (0x21, 0x31, 0x25):
+                    header_offset = HIROM_HEADER_OFFSET
+
+        if len(data) >= header_offset + HEADER_CHECKSUM_OFFSET + 2:
+            # Zero out checksum area for calculation
+            comp_off = header_offset + HEADER_CHECKSUM_COMP_OFFSET
+            check_off = header_offset + HEADER_CHECKSUM_OFFSET
+            data_list[comp_off] = 0
+            data_list[comp_off + 1] = 0
+            data_list[check_off] = 0
+            data_list[check_off + 1] = 0
 
     return sum(data_list) & 0xFFFF
 
@@ -243,12 +254,45 @@ def write_checksum(rom: bytearray, offset: int = LOROM_HEADER_OFFSET) -> Tuple[i
     return checksum, complement
 
 
-def fix_checksum(rom_path: str, verbose: bool = False) -> Tuple[int, int]:
+def detect_header_offset(data: bytearray) -> int:
+    """Detect the header offset based on ROM content.
+
+    Checks both LoROM and HiROM locations and returns the one that
+    looks like a valid SNES header.
+
+    Args:
+        data: ROM data
+
+    Returns:
+        Header offset (LOROM_HEADER_OFFSET or HIROM_HEADER_OFFSET)
+    """
+    rom_size = len(data)
+
+    # Check LoROM location first (most common)
+    if rom_size >= LOROM_HEADER_OFFSET + 64:
+        map_mode = data[LOROM_HEADER_OFFSET + HEADER_MAP_MODE_OFFSET]
+        # LoROM map modes: $20, $30 (and variants)
+        if map_mode in (0x20, 0x30, 0x22):
+            return LOROM_HEADER_OFFSET
+
+    # Check HiROM location
+    if rom_size >= HIROM_HEADER_OFFSET + 64:
+        map_mode = data[HIROM_HEADER_OFFSET + HEADER_MAP_MODE_OFFSET]
+        # HiROM map modes: $21, $31, $25
+        if map_mode in (0x21, 0x31, 0x25):
+            return HIROM_HEADER_OFFSET
+
+    # Default to LoROM if we can't determine
+    return LOROM_HEADER_OFFSET
+
+
+def fix_checksum(rom_path: str, verbose: bool = False, header_offset: int = None) -> Tuple[int, int]:
     """Fix checksum in a ROM file.
 
     Args:
         rom_path: Path to ROM file
         verbose: If True, print status messages
+        header_offset: Header offset to use (auto-detected if None)
 
     Returns:
         Tuple of (checksum, complement)
@@ -267,8 +311,16 @@ def fix_checksum(rom_path: str, verbose: bool = False) -> Tuple[int, int]:
     if rom_size < MIN_ROM_SIZE:
         raise ValueError(f"ROM too small ({rom_size} bytes), need at least {MIN_ROM_SIZE}")
 
+    # Detect or use provided header offset
+    if header_offset is None:
+        header_offset = detect_header_offset(data)
+
+    if verbose:
+        layout = "HiROM" if header_offset == HIROM_HEADER_OFFSET else "LoROM"
+        print(f"ROM layout: {layout} (header at ${header_offset:04X})")
+
     # Calculate and write checksum
-    checksum, complement = write_checksum(data, LOROM_HEADER_OFFSET)
+    checksum, complement = write_checksum(data, header_offset)
 
     if verbose:
         print(f"Checksum: ${checksum:04X}")

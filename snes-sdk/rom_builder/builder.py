@@ -310,7 +310,7 @@ class SNESBuilder:
 
         Args:
             source_dir: Directory of source file
-            cart_type: Cartridge type ("lorom" or "superfx")
+            cart_type: Cartridge type ("lorom", "hirom", "multibank", or "superfx")
 
         Returns:
             Path to linker config file
@@ -319,17 +319,34 @@ class SNESBuilder:
             BuildError: If no suitable config found
         """
         # Check for local config first
-        if cart_type == "superfx":
-            local_cfg = source_dir / "superfx.cfg"
-            if local_cfg.exists():
-                self._log(f"  Using local linker config: {local_cfg}")
-                return local_cfg
+        local_cfg = source_dir / f"{cart_type}.cfg"
+        if local_cfg.exists():
+            self._log(f"  Using local linker config: {local_cfg}")
+            return local_cfg
 
-        # Fall back to default
-        default_cfg = self.project_root / "snes" / "lorom.cfg"
-        if default_cfg.exists():
-            self._log(f"  Using default linker config: {default_cfg}")
-            return default_cfg
+        # Map cart type to config filename
+        config_names = {
+            "lorom": "lorom.cfg",
+            "hirom": "hirom.cfg",
+            "multibank": "lorom-multibank.cfg",
+            "superfx": "superfx.cfg",
+        }
+        config_name = config_names.get(cart_type, f"{cart_type}.cfg")
+
+        # Get SDK directory (parent of rom_builder module)
+        sdk_dir = Path(__file__).parent.parent
+
+        # Check linker_configs/ directory (relative to SDK)
+        sdk_cfg = sdk_dir / "linker_configs" / config_name
+        if sdk_cfg.exists():
+            self._log(f"  Using SDK linker config: {sdk_cfg}")
+            return sdk_cfg
+
+        # Fall back to snes/ directory in project root
+        snes_cfg = self.project_root / "snes" / config_name
+        if snes_cfg.exists():
+            self._log(f"  Using default linker config: {snes_cfg}")
+            return snes_cfg
 
         raise BuildError(f"No linker config found for cart type: {cart_type}")
 

@@ -7,7 +7,7 @@ source code, resolves labels, and outputs raw bytes.
 import re
 from typing import Dict, List, Optional, Tuple
 
-from tools.snes_builder.superfx.gsu_instructions import (
+from .gsu_instructions import (
     # Control
     STOP, NOP, CACHE, LOOP,
     # Shifts

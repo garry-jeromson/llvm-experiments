@@ -1,0 +1,7 @@
+# SNES SDK Python Dependencies
+# Currently uses only Python standard library modules.
+# Add any future dependencies here.
+
+# Development/testing dependencies (optional):
+# pytest>=7.0
+# mypy>=1.0

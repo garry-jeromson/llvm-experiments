@@ -41,3 +41,7 @@ __pycache__/
 *.zip
 docs/snes-programming-book*.pdf
 docs/snes-programming-book*.txt
+
+# Python virtual environments
+.venv/
+__pycache__/

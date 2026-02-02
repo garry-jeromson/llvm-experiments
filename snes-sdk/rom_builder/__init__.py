@@ -4,7 +4,7 @@ This package provides tools for building SNES ROMs from C/C++ or LLVM IR
 sources using the W65816 LLVM backend.
 
 Example usage:
-    from tools.snes_builder import SNESBuilder
+    from rom_builder import SNESBuilder
 
     builder = SNESBuilder()
     result = builder.build(
@@ -16,7 +16,7 @@ Example usage:
         print(f"ROM created: {result.output_path}")
 
 For SuperFX ROMs:
-    from tools.snes_builder.superfx import GSUAssembler, SuperFXROMBuilder
+    from rom_builder.superfx import GSUAssembler, SuperFXROMBuilder
 
     assembler = GSUAssembler()
     code = assembler.assemble("STOP")

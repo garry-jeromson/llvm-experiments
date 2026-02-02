@@ -673,25 +673,27 @@ test-integration-verbose: build-test-runner
 
 SNES_DIR := $(ROOT_DIR)/snes
 SNES_BUILD_DIR := $(BUILD_DIR)/snes
-SNES_BUILDER := $(ROOT_DIR)/tools/snes-builder
+SNES_BUILDER := $(SNES_SDK_DIR)/rom_builder
+SIMPLE_DEMOS_DIR := $(SNES_SDK_DIR)/examples/simple_demos
+LINKER_CONFIGS_DIR := $(SNES_SDK_DIR)/linker_configs
 
 build-snes-demo: deps-runtime
 	@echo "$(BLUE)Building SNES demo ROM...$(NC)"
 	@mkdir -p $(SNES_BUILD_DIR)
-	@python3 $(SNES_BUILDER)/build_rom.py $(SNES_DIR)/demo.c $(SNES_BUILD_DIR)/demo.sfc
+	@python3 $(SNES_BUILDER)/build_rom.py $(SIMPLE_DEMOS_DIR)/demo.c $(SNES_BUILD_DIR)/demo.sfc
 	@echo "$(GREEN)SNES ROM built: $(SNES_BUILD_DIR)/demo.sfc$(NC)"
 
 build-snes-text-demo: deps-runtime
 	@echo "$(BLUE)Building SNES text demo ROM...$(NC)"
 	@mkdir -p $(SNES_BUILD_DIR)
-	@python3 $(SNES_BUILDER)/build_rom.py $(SNES_DIR)/text_demo.c $(SNES_BUILD_DIR)/text_demo.sfc
+	@python3 $(SNES_BUILDER)/build_rom.py $(SIMPLE_DEMOS_DIR)/text_demo.c $(SNES_BUILD_DIR)/text_demo.sfc
 	@echo "$(GREEN)SNES text demo ROM built: $(SNES_BUILD_DIR)/text_demo.sfc$(NC)"
 
 build-snes-test:
 	@echo "$(BLUE)Building standalone SNES test ROM (pure assembly)...$(NC)"
 	@mkdir -p $(SNES_BUILD_DIR)
 	@ca65 --cpu 65816 -o $(SNES_BUILD_DIR)/test_crt0.o $(SNES_DIR)/test_crt0.s
-	@ld65 -C $(SNES_DIR)/lorom.cfg -o $(SNES_BUILD_DIR)/test.sfc $(SNES_BUILD_DIR)/test_crt0.o
+	@ld65 -C $(LINKER_CONFIGS_DIR)/lorom.cfg -o $(SNES_BUILD_DIR)/test.sfc $(SNES_BUILD_DIR)/test_crt0.o
 	@python3 $(SNES_BUILDER)/fix_checksum.py $(SNES_BUILD_DIR)/test.sfc
 	@echo "$(GREEN)Test ROM built: $(SNES_BUILD_DIR)/test.sfc$(NC)"
 
@@ -707,7 +709,7 @@ run-snes-test: build-snes-test
 build-snes-bounce-demo: deps-runtime
 	@echo "$(BLUE)Building SNES bounce demo ROM...$(NC)"
 	@mkdir -p $(SNES_BUILD_DIR)
-	@python3 $(SNES_BUILDER)/build_rom.py $(SNES_DIR)/bounce_demo.c $(SNES_BUILD_DIR)/bounce_demo.sfc
+	@python3 $(SNES_BUILDER)/build_rom.py $(SIMPLE_DEMOS_DIR)/bounce_demo.c $(SNES_BUILD_DIR)/bounce_demo.sfc
 	@echo "$(GREEN)SNES bounce demo ROM built: $(SNES_BUILD_DIR)/bounce_demo.sfc$(NC)"
 
 run-snes-bounce-demo: build-snes-bounce-demo

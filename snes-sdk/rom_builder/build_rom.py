@@ -2,8 +2,7 @@
 """
 Build SNES ROM from C/C++ or LLVM IR source.
 
-This is a CLI wrapper around the SNESBuilder class. For programmatic use,
-import SNESBuilder directly from tools.snes_builder.
+This is a CLI wrapper around the SNESBuilder class.
 
 Pipeline:
 1. Compile C/C++ to LLVM IR (using clang with w65816 target)
@@ -23,12 +22,14 @@ import argparse
 import sys
 from pathlib import Path
 
-# Add project root to path for imports
+# Resolve paths
 script_dir = Path(__file__).parent.resolve()
 project_root = script_dir.parent.parent
-sys.path.insert(0, str(project_root))
 
-from tools.snes_builder import SNESBuilder
+# Add parent directory to path so we can import rom_builder as a package
+sys.path.insert(0, str(script_dir.parent))
+
+from rom_builder.builder import SNESBuilder
 
 
 def main():
@@ -48,7 +49,7 @@ def main():
     )
     parser.add_argument(
         '--cart-type',
-        choices=['lorom', 'superfx'],
+        choices=['lorom', 'hirom', 'multibank', 'superfx'],
         default='lorom',
         help='Cartridge type (default: lorom)'
     )
