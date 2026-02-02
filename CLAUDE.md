@@ -297,6 +297,13 @@ The runtime is automatically built and linked by `make test-c-integration`.
 **Suboptimal Code Generation:**
 - Conditional branches may have suboptimal block layout (mitigated by peephole pass)
 
+**Recursive Functions:**
+- Direct recursion works correctly at -O1 and higher (imaginary registers saved/restored in prologue/epilogue)
+- Mutual recursion (A→B→A) is NOT detected - imaginary registers won't be saved, causing incorrect results
+- At -O0, recursive functions may produce incorrect results due to fixed DP locations getting clobbered
+- At -O2+, LLVM may transform simple recursion patterns into closed-form formulas using 32-bit arithmetic, causing register allocation failures
+- Workaround: Use -O1 for recursive code, avoid mutual recursion, or rewrite as iterative algorithms
+
 **Semantic Mismatches:**
 - Memory ROL/ROR cannot be optimized because W65816's ROL/ROR are "rotate through carry"
   (17-bit rotation including carry flag), while LLVM's ROTL/ROTR are true N-bit rotations.
@@ -307,6 +314,11 @@ The runtime is automatically built and linked by `make test-c-integration`.
   Using i32 or i64 types in function arguments or return values will produce:
   `error: 32-bit and 64-bit integer arguments/return values are not supported on W65816. Use 16-bit types (short, int16_t) instead.`
 - Runtime 8/16-bit mode switching (compile-time flags only)
+
+**Optimization Level:**
+- `-O0` is **explicitly blocked** - the W65816's 3-register architecture requires optimization
+- When no `-O` flag is specified, the toolchain defaults to `-O1`
+- All tests pass at `-O1`, `-O2`, and `-O3`
 
 ---
 

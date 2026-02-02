@@ -28,15 +28,17 @@
    - Full test suite (49 tests) verifies all functions
    - Note: 32-bit shift helpers could be added in the future
 
+6. ~~**Better diagnostics**~~ - Not needed:
+   - The W65816 toolchain now explicitly blocks `-O0` with a clear error message
+   - This prevents most register exhaustion cases at the source
+   - The generic LLVM error ("ran out of registers during register allocation") is adequate for edge cases
+   - Customizing would require modifying LLVM's core register allocator
+
 ## Medium Effort
 
-6. **32-bit shift helpers**:
+7. **32-bit shift helpers**:
    - For cases where 32-bit operations are needed
-   - Could be added to runtime library
-
-7. **Better diagnostics**:
-   - Clearer error messages when register pressure exceeds limits
-   - Warnings for patterns known to generate suboptimal code
+   - Could be added to runtime library (blocked by 32-bit prohibition)
 
 ## Larger Efforts (Not Recommended)
 

@@ -19,7 +19,13 @@
 ## Remaining
 - [ ] Sound driver SPC700 binary - Need SPC700 assembler to compile the driver code
 - [ ] SuperFX driver programs - Need actual SuperFX assembly programs to run
-- [ ] Review SDK code for quality: readability, clear variable names, functions with purpose, no magic numbers, etc.
+
+## Recently Completed
+- [x] SDK code quality review - Added named constants to replace magic numbers:
+  - text.hpp/cpp: `SCREEN_COLS`, `SCREEN_ROWS`, `TAB_ALIGN_MASK`
+  - ppu.hpp: `BRIGHTNESS_MASK`
+  - audio.hpp: Added explanatory comments for counter wrapping logic
+  - superfx.hpp: `HEIGHT_128/160/192`, `DEPTH_2BPP/4BPP/8BPP`
 
 ## Notes
 
