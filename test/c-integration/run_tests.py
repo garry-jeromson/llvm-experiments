@@ -346,7 +346,21 @@ def extract_rodata_section(elf_data):
 
     return rodata_bytes
 
-def apply_relocations(code_bytes, data_bytes, rodata_bytes, elf_data, code_addr, data_addr, rodata_addr, runtime_symbols=None):
+def get_bss_size(elf_data):
+    """Get the size of the .bss section.
+
+    BSS is NOBITS type, so it has no actual data in the file,
+    just a size that needs to be allocated in memory.
+    """
+    sections = parse_elf(elf_data)
+
+    for sec in sections:
+        if sec.get('name') == '.bss':
+            return sec['size']
+
+    return 0
+
+def apply_relocations(code_bytes, data_bytes, rodata_bytes, elf_data, code_addr, data_addr, rodata_addr, bss_addr=0, runtime_symbols=None):
     """Apply relocations to code, data, and rodata sections."""
     code = bytearray(code_bytes)
     data = bytearray(data_bytes) if data_bytes else bytearray()
@@ -373,6 +387,9 @@ def apply_relocations(code_bytes, data_bytes, rodata_bytes, elf_data, code_addr,
             # Handle .rodata and its variants (.rodata.cst8, etc.)
             section_addrs[sec['index']] = rodata_addr + rodata_offset
             rodata_offset += sec['size']
+        elif name == '.bss':
+            # BSS section - uninitialized data
+            section_addrs[sec['index']] = bss_addr
 
     # W65816 relocation types
     R_W65816_16 = 1
@@ -498,13 +515,18 @@ def create_test_binary(code_bytes, data_bytes=b'', rodata_bytes=b'', load_addr=0
     data_addr = code_addr + len(code_bytes)
     rodata_addr = data_addr + len(data_bytes)
 
+    # BSS goes after rodata - it's uninitialized data that needs memory allocation
+    bss_size = get_bss_size(elf_data) if elf_data else 0
+    bss_addr = rodata_addr + len(rodata_bytes)
+
     test_main_offset = 0
     if elf_data:
         test_main_offset = find_test_main_offset(elf_data)
 
     if elf_data:
         code_bytes, data_bytes, rodata_bytes = apply_relocations(
-            code_bytes, data_bytes, rodata_bytes, elf_data, code_addr, data_addr, rodata_addr, runtime_symbols
+            code_bytes, data_bytes, rodata_bytes, elf_data, code_addr, data_addr, rodata_addr,
+            bss_addr=bss_addr, runtime_symbols=runtime_symbols
         )
 
     test_main_addr = code_addr + test_main_offset
