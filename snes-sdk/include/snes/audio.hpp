@@ -72,6 +72,8 @@ inline u8 read_apuio3() { return hal::read8(reg::APUIO3::address); }
 
 // Send a raw command to the APU (no handshaking - fire and forget)
 inline void send_raw_command(u8 cmd_nibble, u8 param) {
+    // Increment command counter (used by SPC700 driver to detect new commands)
+    // Counter wraps 1→255→1, avoiding 0 which indicates "no command"
     g_audio_command_counter = g_audio_command_counter + 1;
     if (g_audio_command_counter == 0) g_audio_command_counter = 1;
 

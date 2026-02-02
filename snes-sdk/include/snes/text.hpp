@@ -6,10 +6,18 @@
 namespace snes {
 namespace text {
 
+// Screen dimensions (tiles)
+constexpr u8 SCREEN_COLS = 32;  // 256 pixels / 8 pixels per tile
+constexpr u8 SCREEN_ROWS = 28;  // 224 pixels / 8 pixels per tile (excluding overscan)
+
+// Tab alignment mask - rounds x position down to multiple of 4
+// Tab stops are at columns 0, 4, 8, 12, 16, 20, 24, 28
+constexpr u8 TAB_ALIGN_MASK = 0xFC;  // ~0x03, clears lower 2 bits
+
 // Text cursor position
 struct Cursor {
-    u8 x;  // Column (0-31)
-    u8 y;  // Row (0-27)
+    u8 x;  // Column (0 to SCREEN_COLS-1)
+    u8 y;  // Row (0 to SCREEN_ROWS-1)
 };
 
 // Text configuration

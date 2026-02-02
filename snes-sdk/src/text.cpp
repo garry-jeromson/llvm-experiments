@@ -17,7 +17,7 @@ void putchar(char c) {
     if (c == '\n') {
         g_cursor.x = 0;
         g_cursor.y++;
-        if (g_cursor.y >= 28) g_cursor.y = 0;
+        if (g_cursor.y >= SCREEN_ROWS) g_cursor.y = 0;
         return;
     }
 
@@ -27,13 +27,13 @@ void putchar(char c) {
         return;
     }
 
-    // Handle tab (4 spaces)
+    // Handle tab (advance to next 4-column boundary)
     if (c == '\t') {
-        g_cursor.x = (g_cursor.x + 4) & 0xFC;
-        if (g_cursor.x >= 32) {
+        g_cursor.x = (g_cursor.x + 4) & TAB_ALIGN_MASK;
+        if (g_cursor.x >= SCREEN_COLS) {
             g_cursor.x = 0;
             g_cursor.y++;
-            if (g_cursor.y >= 28) g_cursor.y = 0;
+            if (g_cursor.y >= SCREEN_ROWS) g_cursor.y = 0;
         }
         return;
     }
@@ -42,8 +42,8 @@ void putchar(char c) {
     if (c < 32 || c > 126) c = '?';
 
     // Calculate tilemap address
-    // Each row is 32 tiles, each tile entry is 2 bytes (tile + attributes)
-    u16 offset = (static_cast<u16>(g_cursor.y) * 32 + g_cursor.x);
+    // Each row is SCREEN_COLS tiles, each tile entry is 2 bytes (tile + attributes)
+    u16 offset = (static_cast<u16>(g_cursor.y) * SCREEN_COLS + g_cursor.x);
     u16 vram_addr = g_config.tilemap_addr + offset;
 
     // Calculate tile number: font_tile_base + (character - 32)
@@ -62,10 +62,10 @@ void putchar(char c) {
 
     // Advance cursor
     g_cursor.x++;
-    if (g_cursor.x >= 32) {
+    if (g_cursor.x >= SCREEN_COLS) {
         g_cursor.x = 0;
         g_cursor.y++;
-        if (g_cursor.y >= 28) g_cursor.y = 0;
+        if (g_cursor.y >= SCREEN_ROWS) g_cursor.y = 0;
     }
 }
 
@@ -93,8 +93,8 @@ void clear() {
     u16 space_tile = g_config.font_tile_base;  // ASCII 32 = space
     u8 attr = (g_config.palette << 2);
 
-    // Fill 32x28 = 896 tiles with space
-    for (u16 i = 0; i < 32 * 28; i++) {
+    // Fill screen with space characters
+    for (u16 i = 0; i < SCREEN_COLS * SCREEN_ROWS; i++) {
         reg::VMDATAL::write(space_tile & 0xFF);
         reg::VMDATAH::write(attr | ((space_tile >> 8) & 0x03));
     }

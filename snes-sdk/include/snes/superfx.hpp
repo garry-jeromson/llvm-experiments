@@ -185,17 +185,30 @@ inline void stop() {
 // Frame Buffer Setup
 // ============================================================================
 
+// Screen height options (scanlines)
+constexpr u8 HEIGHT_128 = 128;
+constexpr u8 HEIGHT_160 = 160;
+constexpr u8 HEIGHT_192 = 192;
+
+// Color depth options (bits per pixel)
+constexpr u8 DEPTH_2BPP = 2;   // 4 colors
+constexpr u8 DEPTH_4BPP = 4;   // 16 colors (default)
+constexpr u8 DEPTH_8BPP = 8;   // 256 colors
+
 // Configure screen mode (height and color depth)
+// ram_bank: SuperFX RAM bank (0 or 1)
+// height:   Frame buffer height (HEIGHT_128, HEIGHT_160, or HEIGHT_192)
+// depth:    Color depth in bits (DEPTH_2BPP, DEPTH_4BPP, or DEPTH_8BPP)
 inline void configure_screen(u8 ram_bank, u8 height, u8 depth) {
     u8 mode = 0;
     // Set color depth
-    if (depth == 2) mode |= scmr::MD_2BPP;
-    else if (depth == 8) mode |= scmr::MD_8BPP;
-    else mode |= scmr::MD_4BPP;
+    if (depth == DEPTH_2BPP) mode |= scmr::MD_2BPP;
+    else if (depth == DEPTH_8BPP) mode |= scmr::MD_8BPP;
+    else mode |= scmr::MD_4BPP;  // Default to 4bpp
     // Set height
-    if (height == 160) mode |= scmr::HT_160;
-    else if (height == 192) mode |= scmr::HT_192;
-    else mode |= scmr::HT_128;
+    if (height == HEIGHT_160) mode |= scmr::HT_160;
+    else if (height == HEIGHT_192) mode |= scmr::HT_192;
+    else mode |= scmr::HT_128;  // Default to 128 lines
     // Enable ROM and RAM access
     mode |= scmr::RON | scmr::RAN;
     // Set RAM bank

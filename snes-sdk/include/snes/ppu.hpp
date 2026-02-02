@@ -21,10 +21,13 @@ struct OAMEntry {
 // Screen Control
 // ============================================================================
 
+// Brightness value mask - bits 0-3 of INIDISP control brightness (0-15)
+static constexpr u8 BRIGHTNESS_MASK = 0x0F;
+
 // Set screen brightness (0-15) and enable display
 // brightness: 0=black, 15=full brightness
 inline void screen_on(u8 brightness) {
-    hal::write8(reg::INIDISP::address, brightness & 0x0F);
+    hal::write8(reg::INIDISP::address, brightness & BRIGHTNESS_MASK);
 }
 
 // Force blank (screen off)
