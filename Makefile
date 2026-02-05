@@ -667,6 +667,7 @@ test-integration: build-test-runner
 test-integration-verbose: build-test-runner
 	@python3 $(RUNNER_DIR)/run-tests.py -b $(BUILD_DIR) -r $(RUNNER_DIR) -v
 
+
 # =============================================================================
 # SNES Demo (Real Emulator Testing)
 # =============================================================================
@@ -740,6 +741,7 @@ test-c-integration-O2: build-test-runner build-c-runtime
 
 test-c-integration-verbose: build-test-runner build-c-runtime
 	@python3 test/c-integration/run_tests.py -b $(BUILD_DIR) --all-opts -v
+
 
 # =============================================================================
 # SNES SDK Examples
