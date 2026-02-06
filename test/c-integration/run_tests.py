@@ -161,6 +161,8 @@ def parse_test_file(path):
         'expect': None,
         'skip': False,
         'skip_reason': None,
+        'skip_at': set(),  # Opt levels to skip (e.g., {"O1", "O2"})
+        'skip_at_reason': None,
         'expect_error': None,  # Expected compilation error pattern
     }
 
@@ -183,6 +185,23 @@ def parse_test_file(path):
     if match:
         metadata['skip'] = True
         metadata['skip_reason'] = match.group(1).strip()
+
+    # Check for per-opt-level skip directive: // SKIP-AT: O1 O2 ...
+    match = re.search(r'// SKIP-AT:\s*(.*)', content)
+    if match:
+        parts = match.group(1).strip()
+        # Extract opt levels (e.g., "O1" or "O2 O3")
+        # Allow a reason after a dash or parenthesized text
+        levels = []
+        reason_parts = []
+        for part in parts.split():
+            if part in ('O0', 'O1', 'O2', 'O3', 'Os', 'Oz'):
+                levels.append(part)
+            else:
+                reason_parts.append(part)
+        metadata['skip_at'] = set(levels)
+        if reason_parts:
+            metadata['skip_at_reason'] = ' '.join(reason_parts)
 
     return metadata
 
@@ -583,16 +602,19 @@ def create_test_binary(code_bytes, data_bytes=b'', rodata_bytes=b'', load_addr=0
 
     return bytes(rom)
 
-def run_error_test(test_file, test_name, expect_error, tools, opt_level='O2'):
+def run_error_test(test_file, test_name, expect_error, tools, opt_level='O2', extra_clang_flags=None):
     """Run a test that expects compilation to fail with a specific error message."""
     with tempfile.TemporaryDirectory() as tmpdir:
         try:
             obj_file = os.path.join(tmpdir, f"{test_name}.o")
 
             # Try to compile C to object file
+            clang_cmd = [tools['clang'], '-target', 'w65816-unknown-none', f'-{opt_level}',
+                 '-c', test_file, '-o', obj_file]
+            if extra_clang_flags:
+                clang_cmd[1:1] = extra_clang_flags
             result = subprocess.run(
-                [tools['clang'], '-target', 'w65816-unknown-none', f'-{opt_level}',
-                 '-c', test_file, '-o', obj_file],
+                clang_cmd,
                 capture_output=True, text=True, timeout=30
             )
 
@@ -620,7 +642,7 @@ def run_error_test(test_file, test_name, expect_error, tools, opt_level='O2'):
             return TestResult(test_name, False, f"error: {expect_error}", None,
                             error=str(e), opt_level=opt_level)
 
-def run_test(test_file, tools, runner_bin, build_dir, verbose=False, opt_level='O2'):
+def run_test(test_file, tools, runner_bin, build_dir, verbose=False, opt_level='O2', extra_clang_flags=None):
     """Compile and run a single test at specified optimization level."""
     test_name = Path(test_file).stem
 
@@ -633,10 +655,15 @@ def run_test(test_file, tools, runner_bin, build_dir, verbose=False, opt_level='
         return TestResult(test_name, None, None, None,
                          error=f"SKIPPED: {metadata['skip_reason']}", opt_level=opt_level)
 
+    if opt_level in metadata.get('skip_at', set()):
+        reason = metadata.get('skip_at_reason', f'SKIP-AT {opt_level}')
+        return TestResult(test_name, None, None, None,
+                         error=f"SKIPPED: {reason} (at -{opt_level})", opt_level=opt_level)
+
     # Handle error tests (tests that expect compilation to fail)
     expect_error = metadata.get('expect_error')
     if expect_error:
-        return run_error_test(test_file, test_name, expect_error, tools, opt_level)
+        return run_error_test(test_file, test_name, expect_error, tools, opt_level, extra_clang_flags)
 
     expected = metadata['expect']
     if expected is None:
@@ -654,9 +681,12 @@ def run_test(test_file, tools, runner_bin, build_dir, verbose=False, opt_level='
             bin_file = os.path.join(tmpdir, f"{test_name}.bin")
 
             # Compile C to object file
+            clang_cmd = [tools['clang'], '-target', 'w65816-unknown-none', f'-{opt_level}',
+                 '-c', test_file, '-o', obj_file]
+            if extra_clang_flags:
+                clang_cmd[1:1] = extra_clang_flags
             result = subprocess.run(
-                [tools['clang'], '-target', 'w65816-unknown-none', f'-{opt_level}',
-                 '-c', test_file, '-o', obj_file],
+                clang_cmd,
                 capture_output=True, text=True, timeout=30
             )
             if result.returncode != 0:
@@ -756,12 +786,17 @@ def main():
                        help='Optimization levels to test (default: O2). Note: O0 not supported by W65816')
     parser.add_argument('--all-opts', action='store_true',
                        help='Test all supported optimization levels (O1, O2, O3)')
+    parser.add_argument('--clang-flags', type=str, default='',
+                       help='Extra flags to pass to clang (e.g., "--clang-flags=-mllvm -global-isel")')
     args = parser.parse_args()
 
     # Handle --all-opts flag
     # Note: O0 is not supported by the W65816 target
     if args.all_opts:
         args.opt_levels = ['O1', 'O2', 'O3']
+
+    # Parse extra clang flags
+    extra_clang_flags = args.clang_flags.split() if args.clang_flags else None
 
     # Find the runner binary
     runner_bin = os.path.join(args.build_dir, 'bin', 'w65816-runner')
@@ -818,7 +853,7 @@ def main():
         if args.jobs > 1:
             with ThreadPoolExecutor(max_workers=args.jobs) as executor:
                 futures = {
-                    executor.submit(run_test, str(tf), tools, runner_bin, args.build_dir, args.verbose, opt_level): tf
+                    executor.submit(run_test, str(tf), tools, runner_bin, args.build_dir, args.verbose, opt_level, extra_clang_flags): tf
                     for tf in test_files
                 }
                 for future in as_completed(futures):
@@ -829,7 +864,7 @@ def main():
                 _print_result(result, len(opt_levels) > 1)
         else:
             for tf in test_files:
-                result = run_test(str(tf), tools, runner_bin, args.build_dir, args.verbose, opt_level)
+                result = run_test(str(tf), tools, runner_bin, args.build_dir, args.verbose, opt_level, extra_clang_flags)
                 results.append(result)
                 _print_result(result, len(opt_levels) > 1)
 
