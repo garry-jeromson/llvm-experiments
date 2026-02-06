@@ -211,8 +211,9 @@ int test_main(void) {
 | `memory/` | arrays, structs, pointers, 2D arrays, memcpy, memset | Memory operations |
 | `register_pressure/` | 4-8 live vars, phi stress, nested diamonds, swap stress | Stress tests for register allocation |
 | `real_world/` | fibonacci, bubble sort, state machine | Practical patterns |
+| `stress/` | deep recursion, matrix ops, many args, complex conditionals | Stress tests |
 
-**Current Status:** 77 passing tests
+**Current Status:** 123 tests, 100% pass rate at O1/O2/O3
 
 **Runtime Library:**
 
