@@ -820,7 +820,7 @@ def main():
         if not test_dir.exists():
             print(f"Error: Test directory not found: {test_dir}")
             return 1
-        test_files = sorted(test_dir.glob('**/*.c'))
+        test_files = sorted(list(test_dir.glob('**/*.c')) + list(test_dir.glob('**/*.cpp')))
 
     if not test_files:
         print("No test files found")
