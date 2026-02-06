@@ -241,25 +241,46 @@ def extract_text_section(elf_data):
 
     raise ValueError("No .text section found")
 
-def extract_data_section(elf_data):
-    """Extract .data section from ELF object file."""
+def extract_data_sections(elf_data):
+    """Extract all data sections from ELF object file.
+
+    Returns:
+        Dict mapping section name to (data bytes, original index).
+        Includes .data, .bss, .fardata, .rodata, .romdata, .bank* sections.
+    """
     sections = parse_elf(elf_data)
+    data_sections = {}
 
     for sec in sections:
-        if sec.get('name') == '.data':
-            return elf_data[sec['offset']:sec['offset'] + sec['size']]
+        name = sec.get('name', '')
+        # Include all data sections (not just .data)
+        if name in ('.data', '.bss', '.fardata', '.rodata', '.romdata') or \
+           name.startswith('.bank'):
+            data = elf_data[sec['offset']:sec['offset'] + sec['size']]
+            data_sections[name] = (data, sec['index'])
 
+    return data_sections
+
+
+def extract_data_section(elf_data):
+    """Extract .data section from ELF object file (legacy API)."""
+    sections = extract_data_sections(elf_data)
+    if '.data' in sections:
+        return sections['.data'][0]
     return b''
 
-def apply_relocations(code_bytes, data_bytes, elf_data, code_addr, data_addr):
+def apply_relocations(code_bytes, data_bytes, elf_data, code_addr, data_addr,
+                      section_addr_map=None):
     """Apply relocations to code and data sections.
 
     Args:
         code_bytes: Raw .text section bytes
-        data_bytes: Raw .data section bytes
+        data_bytes: Combined data section bytes (all data sections concatenated)
         elf_data: Full ELF file data
         code_addr: Address where code will be loaded
-        data_addr: Address where data will be loaded
+        data_addr: Base address where data will be loaded
+        section_addr_map: Optional dict mapping section index to address.
+                          If not provided, builds one from .text and .data only.
 
     Returns:
         Tuple of (relocated_code, relocated_data)
@@ -272,13 +293,13 @@ def apply_relocations(code_bytes, data_bytes, elf_data, code_addr, data_addr):
     relocations = get_relocations(elf_data, sections)
 
     # Build section address map
-    section_addrs = {}
+    section_addrs = section_addr_map if section_addr_map else {}
     text_section_idx = None
     for sec in sections:
         if sec.get('name') == '.text':
             section_addrs[sec['index']] = code_addr
             text_section_idx = sec['index']
-        elif sec.get('name') == '.data':
+        elif sec.get('name') == '.data' and sec['index'] not in section_addrs:
             section_addrs[sec['index']] = data_addr
 
     # W65816 relocation types
@@ -396,7 +417,8 @@ def find_test_main_offset(elf_data):
     # Fallback: assume test_main is at the start
     return 0
 
-def create_test_binary(code_bytes, data_bytes=b'', load_addr=0x8000, elf_data=None):
+def create_test_binary(code_bytes, data_bytes=b'', load_addr=0x8000, elf_data=None,
+                       section_addr_map=None):
     """Create a complete test binary with startup code and vectors.
 
     Memory layout:
@@ -432,7 +454,8 @@ def create_test_binary(code_bytes, data_bytes=b'', load_addr=0x8000, elf_data=No
     # Apply relocations if ELF data is provided
     if elf_data:
         code_bytes, data_bytes = apply_relocations(
-            code_bytes, data_bytes, elf_data, code_addr, data_addr
+            code_bytes, data_bytes, elf_data, code_addr, data_addr,
+            section_addr_map=section_addr_map
         )
 
     test_main_addr = code_addr + test_main_offset
@@ -483,7 +506,8 @@ def create_test_binary(code_bytes, data_bytes=b'', load_addr=0x8000, elf_data=No
 
     return bytes(rom)
 
-def run_test(test_file, tools, runner_dir, runner_bin, verbose=False):
+def run_test(test_file, tools, runner_dir, runner_bin, verbose=False,
+             extra_llc_flags=None):
     """Compile and run a single test."""
     test_name = Path(test_file).stem
 
@@ -507,8 +531,11 @@ def run_test(test_file, tools, runner_dir, runner_bin, verbose=False):
             bin_file = os.path.join(tmpdir, f"{test_name}.bin")
 
             # Compile LLVM IR directly to object file
+            llc_cmd = [tools['llc'], '-march=w65816', '-filetype=obj', test_file, '-o', obj_file]
+            if extra_llc_flags:
+                llc_cmd[1:1] = extra_llc_flags
             result = subprocess.run(
-                [tools['llc'], '-march=w65816', '-filetype=obj', test_file, '-o', obj_file],
+                llc_cmd,
                 capture_output=True, text=True, timeout=30
             )
             if result.returncode != 0:
@@ -526,10 +553,28 @@ def run_test(test_file, tools, runner_dir, runner_bin, verbose=False):
                 return TestResult(test_name, False, expected, None,
                                 error=f"ELF extraction failed: {e}")
 
-            data_bytes = extract_data_section(elf_data)
+            # Extract all data sections and combine them
+            data_sections = extract_data_sections(elf_data)
+            combined_data = bytearray()
+            section_addr_map = {}
+
+            # Calculate base data address (after code)
+            startup_len = 14
+            code_addr = 0x8000 + startup_len
+            base_data_addr = code_addr + len(code_bytes)
+
+            # Combine all data sections and build address map
+            current_offset = 0
+            for sec_name, (sec_data, sec_idx) in data_sections.items():
+                section_addr_map[sec_idx] = base_data_addr + current_offset
+                combined_data.extend(sec_data)
+                current_offset += len(sec_data)
+
+            data_bytes = bytes(combined_data) if combined_data else b''
 
             # Create complete test binary with relocations applied
-            binary = create_test_binary(code_bytes, data_bytes, elf_data=elf_data)
+            binary = create_test_binary(code_bytes, data_bytes, elf_data=elf_data,
+                                        section_addr_map=section_addr_map)
 
             with open(bin_file, 'wb') as f:
                 f.write(binary)
@@ -583,6 +628,8 @@ def main():
                        help='Parallel jobs (default: 1)')
     parser.add_argument('--list', action='store_true',
                        help='List tests without running')
+    parser.add_argument('--llc-flags', type=str, default=None,
+                       help='Extra flags to pass to llc (e.g. --llc-flags="-global-isel -global-isel-abort=0")')
     args = parser.parse_args()
 
     # Find the runner binary
@@ -625,12 +672,14 @@ def main():
     # Run tests
     print(f"Running {len(test_files)} integration tests...\n")
 
+    extra_llc_flags = args.llc_flags.split() if args.llc_flags else None
+
     results = []
     if args.jobs > 1:
         with ThreadPoolExecutor(max_workers=args.jobs) as executor:
             futures = {
                 executor.submit(run_test, str(tf), tools, args.runner_dir,
-                               runner_bin, args.verbose): tf
+                               runner_bin, args.verbose, extra_llc_flags): tf
                 for tf in test_files
             }
             for future in as_completed(futures):
@@ -638,7 +687,7 @@ def main():
     else:
         for tf in test_files:
             result = run_test(str(tf), tools, args.runner_dir, runner_bin,
-                            args.verbose)
+                            args.verbose, extra_llc_flags)
             results.append(result)
 
             # Print result immediately
