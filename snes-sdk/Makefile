@@ -69,6 +69,7 @@ $(BUILD_DIR)/host/%.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)/host
 	$(HOST_CXX) $(HOST_CXXFLAGS) -c $< -o $@
 
 # Unit tests
+# Note: Include all source files needed for testing (hal.cpp, oam.cpp, text.cpp)
 $(BUILD_DIR)/test_unit: $(TEST_DIR)/unit/run_unit_tests.cpp $(SDK_HOST_OBJS) | $(BUILD_DIR)/host
 	$(HOST_CXX) $(HOST_CXXFLAGS) -I$(TEST_DIR)/unit $< $(SDK_HOST_OBJS) -o $@
 
@@ -94,18 +95,43 @@ test-sdk-integration:
 	@echo "TODO: Implement integration test runner"
 
 # ============================================================================
+# Tools Tests
+# ============================================================================
+
+test-tools: $(VENV_DIR)
+	@echo "Running tools tests..."
+	$(VENV_PYTHON) -m pytest $(SDK_ROOT)tools/tests/ -v
+
+# ============================================================================
 # Combined test target
 # ============================================================================
 
-test-sdk: test-unit test-sdk-integration
+test-sdk: test-unit test-sdk-integration test-tools
 
 # ============================================================================
 # Examples
 # ============================================================================
 
-examples: w65816-build
-	@echo "Building examples..."
-	@echo "TODO: Build example programs"
+# Simple C example (syntax check with host compiler)
+check-examples:
+	@echo "Checking example syntax..."
+	$(HOST_CXX) $(HOST_CXXFLAGS) -fsyntax-only $(SDK_ROOT)examples/simple_demos/hello.cpp
+	clang -std=c11 -I$(INCLUDE_DIR) -fsyntax-only $(SDK_ROOT)examples/simple_demos/hello_c.c
+	@echo "Examples syntax OK"
+
+# Build examples for W65816 (requires LLVM build)
+examples: check-examples
+	@echo "Building W65816 examples..."
+	@if [ -f "$(W65816_CC)" ]; then \
+		echo "Compiling hello.cpp for W65816..."; \
+		$(W65816_CC) $(W65816_CXXFLAGS) -S $(SDK_ROOT)examples/simple_demos/hello.cpp -o $(BUILD_DIR)/hello.s; \
+		echo "Compiling hello_c.c for W65816..."; \
+		$(W65816_CC) -target w65816-unknown-none -O2 -I$(INCLUDE_DIR) -S $(SDK_ROOT)examples/simple_demos/hello_c.c -o $(BUILD_DIR)/hello_c.s; \
+		echo "Examples built successfully"; \
+	else \
+		echo "W65816 compiler not found at $(W65816_CC)"; \
+		echo "Run 'make build-fast' in parent directory first"; \
+	fi
 
 # ============================================================================
 # Clean

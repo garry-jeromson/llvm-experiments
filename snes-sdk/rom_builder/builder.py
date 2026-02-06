@@ -176,24 +176,30 @@ class SNESBuilder:
             # Collect objects to link
             link_objects = [crt0_obj]
 
-            # Step 6: Assemble supporting files
-            self._log("\nStep 6: Assemble supporting files")
+            # Step 6: Compile and assemble SDK C API
+            self._log("\nStep 6: Compile SDK C API")
+            sdk_api_obj = self._compile_sdk_api(optimize)
+            if sdk_api_obj:
+                link_objects.append(sdk_api_obj)
+
+            # Step 7: Assemble supporting files
+            self._log("\nStep 7: Assemble supporting files")
             link_objects.extend(self._assemble_supporting_files(source_path))
 
             # Add user code last
             link_objects.append(user_obj)
 
-            # Step 7: Link
-            self._log("\nStep 7: Link ROM")
+            # Step 8: Link
+            self._log("\nStep 8: Link ROM")
             linker_cfg = self.find_linker_config(source_path.parent, cart_type)
             self.link(link_objects, linker_cfg, output_path)
 
-            # Step 8: Pad ROM if needed (SuperFX)
+            # Step 9: Pad ROM if needed (SuperFX)
             if cart_type == "superfx":
                 self._pad_superfx_rom(output_path)
 
-            # Step 9: Fix checksum
-            self._log("\nStep 8: Fix ROM checksum")
+            # Step 10: Fix checksum
+            self._log("\nStep 10: Fix ROM checksum")
             fix_checksum(str(output_path), verbose=self.verbose)
 
             self._log(f"\nSuccess! ROM created: {output_path}")
@@ -228,7 +234,6 @@ class SNESBuilder:
             "-target", "w65816-unknown-none",
             optimize,
             "-S", "-emit-llvm",
-            "-I", str(self.project_root / "snes"),
             "-I", str(self.project_root / "snes-sdk" / "include"),
             str(source),
             "-o", str(ir_path)
@@ -342,12 +347,6 @@ class SNESBuilder:
             self._log(f"  Using SDK linker config: {sdk_cfg}")
             return sdk_cfg
 
-        # Fall back to snes/ directory in project root
-        snes_cfg = self.project_root / "snes" / config_name
-        if snes_cfg.exists():
-            self._log(f"  Using default linker config: {snes_cfg}")
-            return snes_cfg
-
         raise BuildError(f"No linker config found for cart type: {cart_type}")
 
     def find_crt0(self, source_dir: Path, cart_type: str) -> Path:
@@ -369,13 +368,48 @@ class SNESBuilder:
             self._log(f"  Using local crt0.s from {source_dir}")
             return local_crt0
 
-        # Fall back to default
-        default_crt0 = self.project_root / "snes" / "crt0.s"
-        if default_crt0.exists():
-            self._log(f"  Using default crt0.s from snes/")
-            return default_crt0
+        # Get SDK directory (parent of rom_builder module)
+        sdk_dir = Path(__file__).parent.parent
+
+        # Check SDK startup directory
+        sdk_crt0 = sdk_dir / "startup" / "crt0.s"
+        if sdk_crt0.exists():
+            self._log(f"  Using SDK crt0.s from {sdk_crt0}")
+            return sdk_crt0
 
         raise BuildError("No crt0.s found")
+
+    def _compile_sdk_api(self, optimize: str = "-Os") -> Optional[Path]:
+        """Assemble the SDK's C API implementation.
+
+        The SDK API is implemented directly in assembly to avoid register
+        pressure issues on the W65816's limited register set.
+
+        Args:
+            optimize: Unused (kept for API compatibility)
+
+        Returns:
+            Path to assembled object file, or None if not found
+        """
+        # Get SDK directory (parent of rom_builder module)
+        sdk_dir = Path(__file__).parent.parent
+        api_source = sdk_dir / "src" / "snes_api.s"
+
+        if not api_source.exists():
+            self._log("  SDK API assembly not found, skipping")
+            return None
+
+        self._log(f"  Assembling {api_source.name}...")
+
+        # Assemble directly
+        obj_path = self.build_dir / "snes_api.o"
+        self._run([
+            "ca65", "--cpu", "65816",
+            "-o", str(obj_path),
+            str(api_source)
+        ], "Assembling snes_api.s")
+
+        return obj_path
 
     def _assemble_supporting_files(self, source_path: Path) -> List[Path]:
         """Assemble supporting files (fonts, sprites, runtime, data).
@@ -388,11 +422,13 @@ class SNESBuilder:
         """
         objects: List[Path] = []
 
+        # Get SDK directory (parent of rom_builder module)
+        sdk_dir = Path(__file__).parent.parent
+
         # Font file
         self._log("\n  Assembling base data files")
         font_paths = [
-            self.project_root / "snes" / "font.s",
-            self.project_root / "snes-sdk" / "data" / "font_2bpp.s",
+            sdk_dir / "data" / "font_2bpp.s",
         ]
         for font_path in font_paths:
             if font_path.exists():
@@ -406,7 +442,7 @@ class SNESBuilder:
                 break
 
         # Sprites file
-        sprites_path = self.project_root / "snes" / "sprites.s"
+        sprites_path = sdk_dir / "data" / "sprites.s"
         if sprites_path.exists():
             sprites_obj = self.build_dir / "sprites.o"
             self._run([

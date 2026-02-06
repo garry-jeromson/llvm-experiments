@@ -50,10 +50,10 @@ reset:
 
     ldx #$0000
 @clear_vram:
-    stz $2118               ; Write 0 to VRAM
-    stz $2118
+    stz $2118               ; Write 0 to VMDATAL
+    stz $2119               ; Write 0 to VMDATAH (triggers address increment)
     inx
-    cpx #$4000              ; 32KB
+    cpx #$8000              ; 64KB VRAM (32K words)
     bne @clear_vram
 
     ; Clear CGRAM (palette)

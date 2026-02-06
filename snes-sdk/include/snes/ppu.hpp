@@ -363,4 +363,143 @@ namespace cgadsub {
     constexpr u8 SUBTRACT = 0x80;
 }
 
+// ============================================================================
+// OAM Shadow Buffers (for sprite management)
+// ============================================================================
+
+// Low table: 128 sprites × 4 bytes = 512 bytes
+// High table: 128 sprites × 2 bits = 32 bytes (packed)
+// These are shadow buffers in RAM; call sprites_upload() to copy to OAM
+
+#ifdef SNES_TESTING
+// For unit tests, these are defined in the test
+extern OAMEntry oam_low[128];
+extern u8 oam_high[32];
+#else
+// For production, these are statically allocated
+inline OAMEntry oam_low[128];
+inline u8 oam_high[32];
+#endif
+
+// ============================================================================
+// Sprite Class (OAM entry wrapper)
+// ============================================================================
+
+class Sprite {
+    u8 m_id;  // Sprite index (0-127)
+
+public:
+    explicit Sprite(u8 id) : m_id(id) {}
+
+    // Get sprite ID
+    u8 id() const { return m_id; }
+
+    // Set sprite position
+    // x: -256 to 511 (9-bit signed, wraps at screen edges)
+    // y: 0-255 (on-screen 0-223, 224-255 hidden, 240 = hide)
+    void set_pos(i16 x, u8 y) {
+        oam_low[m_id].x_low = static_cast<u8>(x & 0xFF);
+        oam_low[m_id].y = y;
+
+        // Set X high bit in oam_high
+        // Each byte holds 4 sprites: bits 0,2,4,6 = X high bits
+        // Sprite n: byte n/4, bit (n%4)*2
+        u8 byte_idx = m_id >> 2;
+        u8 bit_pos = (m_id & 0x03) << 1;
+        u8 x_high = (x & 0x100) ? 1 : 0;
+
+        oam_high[byte_idx] = static_cast<u8>(
+            (oam_high[byte_idx] & ~(0x01 << bit_pos)) | (x_high << bit_pos)
+        );
+    }
+
+    // Set tile number (0-511)
+    // palette: 0-7
+    // hflip: horizontal flip
+    // vflip: vertical flip
+    void set_tile(u16 tile, u8 palette = 0, bool hflip = false, bool vflip = false) {
+        oam_low[m_id].tile = static_cast<u8>(tile & 0xFF);
+        oam_low[m_id].attr = static_cast<u8>(
+            ((tile >> 8) & 0x01) |           // Bit 0: tile high bit
+            ((palette & 0x07) << 1) |        // Bits 1-3: palette
+            (oam_low[m_id].attr & 0x30) |    // Bits 4-5: priority (preserved)
+            (hflip ? 0x40 : 0) |             // Bit 6: H-flip
+            (vflip ? 0x80 : 0)               // Bit 7: V-flip
+        );
+    }
+
+    // Set sprite priority (0-3, 0=lowest, 3=highest)
+    void set_priority(u8 prio) {
+        oam_low[m_id].attr = static_cast<u8>(
+            (oam_low[m_id].attr & ~0x30) | ((prio & 0x03) << 4)
+        );
+    }
+
+    // Set sprite size (false=small, true=large)
+    // Actual size depends on OBSEL register setting
+    void set_size(bool large) {
+        // Size bit is at position 1 in each sprite's high table entry
+        // Sprite n: byte n/4, bit (n%4)*2 + 1
+        u8 byte_idx = m_id >> 2;
+        u8 bit_pos = ((m_id & 0x03) << 1) + 1;
+
+        if (large) {
+            oam_high[byte_idx] |= static_cast<u8>(1 << bit_pos);
+        } else {
+            oam_high[byte_idx] &= static_cast<u8>(~(1 << bit_pos));
+        }
+    }
+
+    // Hide sprite by moving off-screen
+    void hide() {
+        oam_low[m_id].y = 240;  // Below visible area
+    }
+};
+
+// ============================================================================
+// Sprite Management Functions
+// ============================================================================
+
+// Clear all sprites (hide them all)
+inline void sprites_clear() {
+    for (int i = 0; i < 128; i++) {
+        oam_low[i].x_low = 0;
+        oam_low[i].y = 240;  // Off-screen
+        oam_low[i].tile = 0;
+        oam_low[i].attr = 0;
+    }
+    for (int i = 0; i < 32; i++) {
+        oam_high[i] = 0;
+    }
+}
+
+// Upload shadow OAM to hardware OAM via DMA
+// Should be called during VBlank
+inline void sprites_upload() {
+    // Set OAM address to 0
+    set_oamaddr(0);
+
+    // DMA channel 0: transfer oam_low (512 bytes) + oam_high (32 bytes)
+    // Total: 544 bytes
+
+    // Set DMA mode: A→B, 8-bit, auto-increment
+    set_dmap0(0x00);
+
+    // Set destination: OAMDATA ($2104)
+    set_bbad0(0x04);
+
+    // Set source address (oam_low)
+    u32 src = reinterpret_cast<u32>(&oam_low[0]);
+    set_a1t0l(static_cast<u8>(src & 0xFF));
+    set_a1t0h(static_cast<u8>((src >> 8) & 0xFF));
+    set_a1b0(static_cast<u8>((src >> 16) & 0xFF));
+
+    // Set transfer size: 544 bytes (0x220)
+    set_das0l(0x20);
+    set_das0h(0x02);
+
+    // Start DMA channel 0
+    start_dma(0x01);
+}
+
 } // namespace snes::ppu

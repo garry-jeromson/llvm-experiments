@@ -113,13 +113,16 @@ def _extract_symbol_from_operand(operand: str) -> str:
         operand = operand.split('-')[0]
 
     # Check if it looks like a valid external symbol:
-    # - Must start with _ (C mangled names)
+    # - Must be a valid C identifier (starts with letter or _, contains alphanumeric or _)
     # - Must be longer than 1 character
-    # - Must not be a numeric constant
+    # - Must not be a numeric constant or hex literal
+    # - Exclude local labels (starting with .L)
     if (operand
-            and operand.startswith('_')
             and len(operand) > 1
-            and not operand.startswith('$')):
+            and not operand.startswith('$')
+            and not operand.startswith('.')
+            and not operand[0].isdigit()
+            and operand.replace('_', '').isalnum()):
         return operand
 
     return ''

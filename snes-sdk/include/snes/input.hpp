@@ -95,4 +95,152 @@ static constexpr u16 BTN16_X      = 0x0040;
 static constexpr u16 BTN16_L      = 0x0020;
 static constexpr u16 BTN16_R      = 0x0010;
 
+// ============================================================================
+// Button Enum (type-safe, 16-bit values)
+// ============================================================================
+
+enum class Button : u16 {
+    B      = 0x8000,
+    Y      = 0x4000,
+    Select = 0x2000,
+    Start  = 0x1000,
+    Up     = 0x0800,
+    Down   = 0x0400,
+    Left   = 0x0200,
+    Right  = 0x0100,
+    A      = 0x0080,
+    X      = 0x0040,
+    L      = 0x0020,
+    R      = 0x0010
+};
+
+// Allow bitwise OR on Button values
+inline u16 operator|(Button a, Button b) {
+    return static_cast<u16>(a) | static_cast<u16>(b);
+}
+
+inline u16 operator|(u16 a, Button b) {
+    return a | static_cast<u16>(b);
+}
+
+// ============================================================================
+// Direction Enum (8-way + none)
+// ============================================================================
+
+enum class Direction : u8 {
+    None       = 0,
+    Up         = 1,
+    UpRight    = 2,
+    Right      = 3,
+    DownRight  = 4,
+    Down       = 5,
+    DownLeft   = 6,
+    Left       = 7,
+    UpLeft     = 8
+};
+
+// ============================================================================
+// Joypad Class (stateful input handling with edge detection)
+// ============================================================================
+
+class Joypad {
+    u8 m_id;          // Joypad index (0 or 1)
+    u16 m_current;    // Current frame button state
+    u16 m_previous;   // Previous frame button state
+
+public:
+    // Construct for joypad 0 or 1
+    explicit Joypad(u8 id = 0) : m_id(id), m_current(0), m_previous(0) {}
+
+    // Update button state (call once per frame)
+    void update() {
+        m_previous = m_current;
+
+        // Read from hardware based on joypad ID
+        u32 addr_lo = 0x4218 + (m_id * 2);
+        u32 addr_hi = addr_lo + 1;
+
+        u8 lo = hal::read8(addr_lo);
+        u8 hi = hal::read8(addr_hi);
+        m_current = static_cast<u16>((hi << 8) | lo);
+    }
+
+    // Get raw button state
+    u16 raw() const { return m_current; }
+
+    // Check if button is currently held
+    bool held(Button btn) const {
+        return (m_current & static_cast<u16>(btn)) != 0;
+    }
+
+    // Check if any of the specified buttons are held
+    bool held_any(u16 mask) const {
+        return (m_current & mask) != 0;
+    }
+
+    // Check if all of the specified buttons are held
+    bool held_all(u16 mask) const {
+        return (m_current & mask) == mask;
+    }
+
+    // Check if button was just pressed this frame (edge detection)
+    bool pressed(Button btn) const {
+        u16 mask = static_cast<u16>(btn);
+        return (m_current & mask) != 0 && (m_previous & mask) == 0;
+    }
+
+    // Check if button was just released this frame (edge detection)
+    bool released(Button btn) const {
+        u16 mask = static_cast<u16>(btn);
+        return (m_current & mask) == 0 && (m_previous & mask) != 0;
+    }
+
+    // Get current D-pad direction (8-way + none)
+    Direction direction() const {
+        bool up    = held(Button::Up);
+        bool down  = held(Button::Down);
+        bool left  = held(Button::Left);
+        bool right = held(Button::Right);
+
+        // Cancel out opposing directions
+        if (up && down) { up = false; down = false; }
+        if (left && right) { left = false; right = false; }
+
+        if (up) {
+            if (left) return Direction::UpLeft;
+            if (right) return Direction::UpRight;
+            return Direction::Up;
+        }
+        if (down) {
+            if (left) return Direction::DownLeft;
+            if (right) return Direction::DownRight;
+            return Direction::Down;
+        }
+        if (left) return Direction::Left;
+        if (right) return Direction::Right;
+
+        return Direction::None;
+    }
+
+    // Get horizontal axis (-1 = left, 0 = none, 1 = right)
+    i8 axis_x() const {
+        bool left  = held(Button::Left);
+        bool right = held(Button::Right);
+
+        if (left && !right) return -1;
+        if (right && !left) return 1;
+        return 0;
+    }
+
+    // Get vertical axis (-1 = up, 0 = none, 1 = down)
+    i8 axis_y() const {
+        bool up   = held(Button::Up);
+        bool down = held(Button::Down);
+
+        if (up && !down) return -1;
+        if (down && !up) return 1;
+        return 0;
+    }
+};
+
 } // namespace snes::input
