@@ -206,14 +206,15 @@ int test_main(void) {
 
 | Category | Tests | Description |
 |----------|-------|-------------|
-| `arithmetic/` | add, sub, neg, mul, div, mod, shifts, bitwise, signed ops | Basic arithmetic operations |
-| `control_flow/` | if_else, loops, switch, comparisons, break, early return | Control flow patterns |
-| `memory/` | arrays, structs, pointers, 2D arrays, memcpy, memset | Memory operations |
+| `arithmetic/` | add, sub, neg, mul, div, mod, shifts, bitwise, sizeof | Basic arithmetic operations |
+| `control_flow/` | if_else, loops, switch, goto, continue, ternary, logical ops | Control flow patterns |
+| `memory/` | arrays, structs, pointers, unions, enums, static vars, bitfields | Memory operations |
 | `register_pressure/` | 4-8 live vars, phi stress, nested diamonds, swap stress | Stress tests for register allocation |
 | `real_world/` | fibonacci, bubble sort, state machine | Practical patterns |
 | `stress/` | deep recursion, matrix ops, many args, complex conditionals | Stress tests |
+| `cpp/` | classes, references, constructors, destructors, operator overloading | C++ features (embedded subset) |
 
-**Current Status:** 123 tests, 100% pass rate at O1/O2/O3
+**Current Status:** 164 tests (C and C++), 100% pass rate at O1/O2/O3
 
 **Runtime Library:**
 
@@ -311,6 +312,9 @@ The runtime is automatically built and linked by `make test-c-integration`.
   For rotate-through-carry operations, use inline assembly.
 
 **Not Implemented:**
+- **Function pointers** - The W65816 has no indirect JSR instruction. Calls through function
+  pointers would require a PEA+JMP sequence (push return address, jump indirect). Use direct
+  function calls or switch statements as alternatives.
 - 32-bit integer operations are **prohibited with clear error messages** at compile time.
   Using i32 or i64 types in function arguments or return values will produce:
   `error: 32-bit and 64-bit integer arguments/return values are not supported on W65816. Use 16-bit types (short, int16_t) instead.`
